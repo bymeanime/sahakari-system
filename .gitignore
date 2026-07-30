@@ -91,3 +91,4 @@ Caddyfile
 
 # Scripts output
 scripts/seed.js
+.env*
