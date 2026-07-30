@@ -1,5 +1,44 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
+
+// -----------------------------------------------------------
+// Zod Validation Schemas (Fix 11)
+// -----------------------------------------------------------
+
+const depositSchema = z.object({
+  action: z.literal('deposit'),
+  accountNo: z.string().regex(/^SA-\d{3,}$/, 'Account number must be in format SA-XXX'),
+  amount: z.number().positive('Amount must be a positive number'),
+  description: z.string().optional(),
+  date: z.string().optional(),
+  processedBy: z.string().optional(),
+})
+
+const withdrawalSchema = z.object({
+  action: z.literal('withdraw'),
+  accountNo: z.string().regex(/^SA-\d{3,}$/, 'Account number must be in format SA-XXX'),
+  amount: z.number().positive('Amount must be a positive number'),
+  description: z.string().optional(),
+  date: z.string().optional(),
+  processedBy: z.string().optional(),
+})
+
+const createAccountSchema = z.object({
+  memberId: z.string().min(1, 'Member ID is required'),
+  productId: z.string().min(1, 'Product ID is required'),
+  initialDeposit: z.number().min(0, 'Initial deposit cannot be negative').optional(),
+  openedDate: z.string().optional(),
+  nominiName: z.string().optional(),
+  nominiRelation: z.string().optional(),
+  processedBy: z.string().optional(),
+})
+
+const savingsActionSchema = z.discriminatedUnion('action', [
+  depositSchema,
+  withdrawalSchema,
+  createAccountSchema,
+])
 
 // GET /api/savings - List all savings accounts
 export async function GET(request: Request) {
@@ -31,45 +70,143 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
 
-    if (body.action === 'deposit') {
-      const account = await db.savingsAccount.update({
-        where: { accountNo: body.accountNo },
-        data: { balance: { increment: body.amount } },
-      })
-      await db.savingsTransaction.create({
-        data: {
-          accountNo: body.accountNo,
-          type: 'DEPOSIT',
-          amount: body.amount,
-          balanceAfter: account.balance,
-          description: body.description || 'Cash deposit',
-          transactionDate: body.date || new Date().toISOString().split('T')[0],
-          processedBy: body.processedBy || 'ADMIN',
-        },
-      })
-      return NextResponse.json(account)
+    // Validate input with Zod
+    const parsed = savingsActionSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      )
     }
 
-    if (body.action === 'withdraw') {
-      const account = await db.savingsAccount.update({
-        where: { accountNo: body.accountNo },
-        data: { balance: { decrement: body.amount } },
+    const data = parsed.data
+
+    // --- DEPOSIT ---
+    if (data.action === 'deposit') {
+      const result = await db.$transaction(async (tx) => {
+        const account = await tx.savingsAccount.findUnique({
+          where: { accountNo: data.accountNo },
+          include: { product: true },
+        })
+
+        if (!account) {
+          throw new Error('Account not found / खाता भेटिएन')
+        }
+
+        // Account status validation: only ACTIVE or DORMANT accounts can accept deposits
+        if (account.status !== 'ACTIVE' && account.status !== 'DORMANT') {
+          throw new Error(`Cannot deposit to ${account.status} account / ${account.status} खातामा जम्मा गर्न सकिँदैन`)
+        }
+
+        // Reactivate DORMANT account on deposit
+        const updateData: any = { balance: { increment: data.amount } }
+        if (account.status === 'DORMANT') {
+          updateData.status = 'ACTIVE'
+        }
+
+        const updatedAccount = await tx.savingsAccount.update({
+          where: { accountNo: data.accountNo },
+          data: updateData,
+        })
+
+        await tx.savingsTransaction.create({
+          data: {
+            accountNo: data.accountNo,
+            type: 'DEPOSIT',
+            amount: data.amount,
+            balanceAfter: updatedAccount.balance,
+            description: data.description || (account.status === 'DORMANT' ? 'Reactivation deposit / पुनः सक्रिय जम्मा' : 'Cash deposit'),
+            transactionDate: data.date || new Date().toISOString().split('T')[0],
+            processedBy: data.processedBy || 'ADMIN',
+          },
+        })
+
+        return updatedAccount
       })
-      await db.savingsTransaction.create({
-        data: {
-          accountNo: body.accountNo,
-          type: 'WITHDRAWAL',
-          amount: body.amount,
-          balanceAfter: account.balance,
-          description: body.description || 'Cash withdrawal',
-          transactionDate: body.date || new Date().toISOString().split('T')[0],
-          processedBy: body.processedBy || 'ADMIN',
-        },
-      })
-      return NextResponse.json(account)
+
+      return NextResponse.json(result)
     }
 
-    // Create new account
+    // --- WITHDRAWAL ---
+    if (data.action === 'withdraw') {
+      const result = await db.$transaction(async (tx) => {
+        const account = await tx.savingsAccount.findUnique({
+          where: { accountNo: data.accountNo },
+          include: { product: true },
+        })
+
+        if (!account) {
+          throw new Error('Account not found / खाता भेटिएन')
+        }
+
+        // Account status validation: only ACTIVE accounts can withdraw
+        if (account.status !== 'ACTIVE') {
+          throw new Error(`Cannot withdraw from ${account.status} account / ${account.status} खाताबाट निकासा गर्न सकिँदैन`)
+        }
+
+        // Check minimum balance constraint
+        const minBalance = account.product?.minBalance || 0
+        const balanceAfterWithdrawal = account.balance - data.amount
+        if (balanceAfterWithdrawal < minBalance) {
+          throw new Error(
+            `Insufficient balance. Minimum balance requirement: Rs. ${minBalance}. Available for withdrawal: Rs. ${account.balance - minBalance} / ` +
+            `अपर्याप्त शेष। न्यूनतम शेष आवश्यकता: रु. ${minBalance}। निकासा योग्य: रु. ${account.balance - minBalance}`
+          )
+        }
+
+        // Check lock-in period
+        if (account.product?.lockInPeriod) {
+          const openedDate = new Date(account.openedDate)
+          const lockInEndDate = new Date(openedDate)
+          lockInEndDate.setMonth(lockInEndDate.getMonth() + account.product.lockInPeriod)
+          if (new Date() < lockInEndDate) {
+            throw new Error(
+              `Account is in lock-in period until ${lockInEndDate.toISOString().split('T')[0]}. Withdrawal not allowed / ` +
+              `खाता ${lockInEndDate.toISOString().split('T')[0]} सम्म लक-इन अवधिमा छ। निकासा गर्न सकिँदैन`
+            )
+          }
+        }
+
+        // Check withdrawal limit from product
+        if (account.product?.withdrawalLimit && data.amount > account.product.withdrawalLimit) {
+          throw new Error(
+            `Withdrawal amount exceeds product limit of Rs. ${account.product.withdrawalLimit} / ` +
+            `निकासा रकम उत्पादन सीमा रु. ${account.product.withdrawalLimit} भन्दा बढी छ`
+          )
+        }
+
+        // Check sufficient balance
+        if (account.balance < data.amount) {
+          throw new Error(
+            `Insufficient balance. Current balance: Rs. ${account.balance} / ` +
+            `अपर्याप्त शेष। हालको शेष: रु. ${account.balance}`
+          )
+        }
+
+        const updatedAccount = await tx.savingsAccount.update({
+          where: { accountNo: data.accountNo },
+          data: { balance: { decrement: data.amount } },
+        })
+
+        await tx.savingsTransaction.create({
+          data: {
+            accountNo: data.accountNo,
+            type: 'WITHDRAWAL',
+            amount: data.amount,
+            balanceAfter: updatedAccount.balance,
+            description: data.description || 'Cash withdrawal',
+            transactionDate: data.date || new Date().toISOString().split('T')[0],
+            processedBy: data.processedBy || 'ADMIN',
+          },
+        })
+
+        return updatedAccount
+      })
+
+      return NextResponse.json(result)
+    }
+
+    // --- CREATE NEW ACCOUNT ---
     const lastAccount = await db.savingsAccount.findFirst({ orderBy: { accountNo: 'desc' } })
     const nextNum = lastAccount ? parseInt(lastAccount.accountNo.replace('SA-', '')) + 1 : 1
     const accountNo = `SA-${String(nextNum).padStart(3, '0')}`
@@ -77,34 +214,36 @@ export async function POST(request: Request) {
     const account = await db.savingsAccount.create({
       data: {
         accountNo,
-        memberId: body.memberId,
-        productId: body.productId,
-        balance: body.initialDeposit || 0,
+        memberId: data.memberId,
+        productId: data.productId,
+        balance: data.initialDeposit || 0,
         interestEarned: 0,
-        openedDate: body.openedDate || new Date().toISOString().split('T')[0],
+        openedDate: data.openedDate || new Date().toISOString().split('T')[0],
         status: 'ACTIVE',
-        nominiName: body.nominiName || null,
-        nominiRelation: body.nominiRelation || null,
+        nominiName: data.nominiName || null,
+        nominiRelation: data.nominiRelation || null,
       },
     })
 
-    if (body.initialDeposit && body.initialDeposit > 0) {
+    if (data.initialDeposit && data.initialDeposit > 0) {
       await db.savingsTransaction.create({
         data: {
           accountNo: account.accountNo,
           type: 'DEPOSIT',
-          amount: body.initialDeposit,
-          balanceAfter: body.initialDeposit,
+          amount: data.initialDeposit,
+          balanceAfter: data.initialDeposit,
           description: 'Opening deposit',
-          transactionDate: body.openedDate || new Date().toISOString().split('T')[0],
-          processedBy: body.processedBy || 'ADMIN',
+          transactionDate: data.openedDate || new Date().toISOString().split('T')[0],
+          processedBy: data.processedBy || 'ADMIN',
         },
       })
     }
 
     return NextResponse.json(account, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Savings error:', error)
-    return NextResponse.json({ error: 'Failed to process savings' }, { status: 500 })
+    // Return meaningful error messages from transaction validation
+    const message = error?.message || 'Failed to process savings'
+    return NextResponse.json({ error: message }, { status: 400 })
   }
 }

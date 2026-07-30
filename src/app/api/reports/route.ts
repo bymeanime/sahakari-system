@@ -28,14 +28,34 @@ export async function GET(request: Request) {
     const totalDeposits = journalEntries.filter(j => j.status === 'POSTED').reduce((sum, j) => sum + j.items.reduce((s, i) => s + i.debit, 0), 0)
     const totalSalaryExpense = employees.reduce((s, e) => s + e.salary, 0)
 
+    // Calculate cash and bank balances from chart of accounts (Fix 12)
+    const cashInHand = accounts
+      .filter(a => a.type === 'ASSET' && (a.subType === 'CASH' || a.name.toLowerCase().includes('cash') || a.name.toLowerCase().includes('नगद')))
+      .reduce((s, a) => {
+        const debitTotal = journalEntries.filter(j => j.status === 'POSTED').reduce((sum, j) =>
+          sum + j.items.filter(i => i.accountId === a.id).reduce((s, i) => s + i.debit - i.credit, 0), 0)
+        return s + Math.max(0, debitTotal)
+      }, 0)
+
+    const bankBalance = accounts
+      .filter(a => a.type === 'ASSET' && (a.subType === 'BANK' || a.name.toLowerCase().includes('bank') || a.name.toLowerCase().includes('बैंक')))
+      .reduce((s, a) => {
+        const debitTotal = journalEntries.filter(j => j.status === 'POSTED').reduce((sum, j) =>
+          sum + j.items.filter(i => i.accountId === a.id).reduce((s, i) => s + i.debit - i.credit, 0), 0)
+        return s + Math.max(0, debitTotal)
+      }, 0)
+
     // Income Statement
     const interestIncome = loanApps.filter(l => l.status === 'DISBURSED').reduce((s, l) => {
       const rate = l.interestRate || 0
-      const amount = l.disbursedAmount || 0
+      const amount = l.outstandingAmount || 0
       return s + (amount * rate / 100 / 12)
     }, 0)
     const interestExpense = savingsAccounts.reduce((s, a) => s + (a.balance * (a.product?.interestRate || 0) / 100 / 12), 0)
     const netIncome = interestIncome - interestExpense - totalSalaryExpense
+
+    // Mandatory reserve fund per Cooperative Act 2047 Section 66 (Fix 6)
+    const reserveFund = netIncome > 0 ? Math.round(netIncome * 0.25) : 0
 
     // NRB Regulatory Report Data
     const nrbReturn = {
@@ -47,7 +67,7 @@ export async function GET(request: Request) {
       province: 'Bagmati',
       capitalAdequacy: {
         shareCapital: totalShareCapital,
-        reserveFund: 0,
+        reserveFund: reserveFund,
         retainedEarnings: netIncome > 0 ? netIncome : 0,
         totalCapital: totalShareCapital + (netIncome > 0 ? netIncome : 0),
         riskWeightedAssets: totalLoansDisbursed,
@@ -116,12 +136,12 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       balanceSheet: {
-        assets: { cashInHand: 120000, bankBalance: 380000, loanReceivable: totalOutstanding, fixedAssets: totalAssets, totalAssets: 120000 + 380000 + totalOutstanding + totalAssets },
-        liabilities: { memberDeposits: totalSavings, shareCapital: totalShareCapital, reserveFund: 0, retainedEarnings: netIncome > 0 ? netIncome : 0, totalLiabilities: totalSavings + totalShareCapital + (netIncome > 0 ? netIncome : 0) },
+        assets: { cashInHand, bankBalance, loanReceivable: totalOutstanding, fixedAssets: totalAssets, totalAssets: cashInHand + bankBalance + totalOutstanding + totalAssets },
+        liabilities: { memberDeposits: totalSavings, shareCapital: totalShareCapital, reserveFund, retainedEarnings: netIncome > 0 ? netIncome : 0, totalLiabilities: totalSavings + totalShareCapital + reserveFund + (netIncome > 0 ? netIncome : 0) },
       },
       incomeStatement: {
         income: { interestIncome: Math.round(interestIncome), feeIncome: 5000, otherIncome: 0, totalIncome: Math.round(interestIncome) + 5000 },
-        expenses: { interestExpense: Math.round(interestExpense), salaryExpense: totalSalaryExpense, officeExpense: 15000, depreciation: assets.reduce((s, a) => s + a.accumulatedDep, 0) / 5, totalExpenses: Math.round(interestExpense) + totalSalaryExpense + 15000 },
+        expenses: { interestExpense: Math.round(interestExpense), salaryExpense: totalSalaryExpense, officeExpense: 15000, depreciation: assets.filter(a => a.status === 'ACTIVE').reduce((s, a) => s + (a.depreciationRate > 0 ? (a.purchasePrice * 0.95) * (a.depreciationRate / 100) : 0), 0), totalExpenses: Math.round(interestExpense) + totalSalaryExpense + 15000 },
         netIncome: Math.round(netIncome),
       },
       nrbReturn,

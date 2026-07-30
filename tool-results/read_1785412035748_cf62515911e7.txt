@@ -1,0 +1,547 @@
+     1→import { db } from '../src/lib/db'
+     2→
+     3→const ORG_ID = 'org-sahakari-001'
+     4→const BRANCH_ID_MAIN = 'branch-main-001'
+     5→const BRANCH_ID_2 = 'branch-west-002'
+     6→
+     7→async function main() {
+     8→  console.log('🌱 Seeding Sahakari System...')
+     9→
+    10→  // 1. Create Organization
+    11→  await db.organization.upsert({
+    12→    where: { id: ORG_ID },
+    13→    update: {},
+    14→    create: {
+    15→      id: ORG_ID,
+    16→      name: 'Janata Sahakari Sanstha Ltd.',
+    17→      nameNepali: 'जनता सहकारी संस्था लि.',
+    18→      code: 'JSS-001',
+    19→      registrationNo: 'REG-2080-1234',
+    20→      panNo: '301234567',
+    21→      address: 'Putalisadak, Kathmandu',
+    22→      district: 'Kathmandu',
+    23→      province: 'Bagmati',
+    24→      wardNo: '5',
+    25→      municipality: 'Kathmandu Metropolitan City',
+    26→      phone: '01-4234567',
+    27→      email: 'info@janatasahakari.org.np',
+    28→      level: 'PRIMARY',
+    29→      fiscalYear: '2082/83',
+    30→      establishedDate: '2070-01-15',
+    31→      isActive: true,
+    32→    },
+    33→  })
+    34→
+    35→  // 2. Create Branches
+    36→  await db.branch.upsert({
+    37→    where: { id: BRANCH_ID_MAIN },
+    38→    update: {},
+    39→    create: {
+    40→      id: BRANCH_ID_MAIN,
+    41→      name: 'Main Branch - Putalisadak',
+    42→      code: 'BR-MAIN',
+    43→      address: 'Putalisadak, Kathmandu',
+    44→      district: 'Kathmandu',
+    45→      phone: '01-4234567',
+    46→      organizationId: ORG_ID,
+    47→      isActive: true,
+    48→    },
+    49→  })
+    50→
+    51→  await db.branch.upsert({
+    52→    where: { id: BRANCH_ID_2 },
+    53→    update: {},
+    54→    create: {
+    55→      id: BRANCH_ID_2,
+    56→      name: 'West Branch - Kalanki',
+    57→      code: 'BR-WEST',
+    58→      address: 'Kalanki, Kathmandu',
+    59→      district: 'Kathmandu',
+    60→      phone: '01-4345678',
+    61→      organizationId: ORG_ID,
+    62→      isActive: true,
+    63→    },
+    64→  })
+    65→
+    66→  // 3. Create Users
+    67→  await db.user.upsert({
+    68→    where: { email: 'admin@janatasahakari.org.np' },
+    69→    update: {},
+    70→    create: {
+    71→      email: 'admin@janatasahakari.org.np',
+    72→      password: 'admin123',
+    73→      name: 'Ram Bahadur Shrestha',
+    74→      nameNepali: 'राम बहादुर श्रेष्ठ',
+    75→      phone: '9841234567',
+    76→      role: 'ADMIN',
+    77→      organizationId: ORG_ID,
+    78→      branchId: BRANCH_ID_MAIN,
+    79→      isActive: true,
+    80→    },
+    81→  })
+    82→
+    83→  // 4. Create Members
+    84→  const memberData = [
+    85→    { memberNo: 'M-001', firstName: 'Sita', lastName: 'Thapa', firstNameNep: 'सीता', lastNameNep: 'थापा', fatherName: 'Hari Thapa', gender: 'FEMALE', phone: '9841234501', occupation: 'Business', membershipDate: '2075-03-15', district: 'Kathmandu', province: 'Bagmati', wardNo: '5', municipality: 'Kathmandu' },
+    86→    { memberNo: 'M-002', firstName: 'Hari', lastName: 'Magar', firstNameNep: 'हरि', lastNameNep: 'मगर', fatherName: 'Bhim Magar', gender: 'MALE', phone: '9841234502', occupation: 'Farmer', membershipDate: '2075-04-20', district: 'Kavre', province: 'Bagmati', wardNo: '3', municipality: 'Banepa' },
+    87→    { memberNo: 'M-003', firstName: 'Laxmi', lastName: 'Tamang', firstNameNep: 'लक्ष्मी', lastNameNep: 'तामाङ', fatherName: 'Dawa Tamang', gender: 'FEMALE', phone: '9841234503', occupation: 'Teacher', membershipDate: '2076-01-10', district: 'Lalitpur', province: 'Bagmati', wardNo: '7', municipality: 'Lalitpur' },
+    88→    { memberNo: 'M-004', firstName: 'Bishnu', lastName: 'Gurung', firstNameNep: 'विष्णु', lastNameNep: 'गुरुङ', fatherName: 'Chandra Gurung', gender: 'MALE', phone: '9841234504', occupation: 'Driver', membershipDate: '2076-06-05', district: 'Dhading', province: 'Bagmati', wardNo: '2', municipality: 'Dhading Besi' },
+    89→    { memberNo: 'M-005', firstName: 'Anita', lastName: 'Rai', firstNameNep: 'अनिता', lastNameNep: 'राई', fatherName: 'Mohan Rai', gender: 'FEMALE', phone: '9841234505', occupation: 'Tailor', membershipDate: '2077-02-18', district: 'Bhaktapur', province: 'Bagmati', wardNo: '4', municipality: 'Bhaktapur' },
+    90→    { memberNo: 'M-006', firstName: 'Krishna', lastName: 'Sharma', firstNameNep: 'कृष्ण', lastNameNep: 'शर्मा', fatherName: 'Gopal Sharma', gender: 'MALE', phone: '9841234506', occupation: 'Shopkeeper', membershipDate: '2077-08-12', district: 'Kathmandu', province: 'Bagmati', wardNo: '10', municipality: 'Kathmandu' },
+    91→    { memberNo: 'M-007', firstName: 'Maya', lastName: 'Dongol', firstNameNep: 'माया', lastNameNep: 'डंगोल', fatherName: 'Suresh Dongol', gender: 'FEMALE', phone: '9841234507', occupation: 'Business', membershipDate: '2078-01-25', district: 'Lalitpur', province: 'Bagmati', wardNo: '3', municipality: 'Lalitpur' },
+    92→    { memberNo: 'M-008', firstName: 'Prem', lastName: 'BK', firstNameNep: 'प्रेम', lastNameNep: 'बीके', fatherName: 'Kumar BK', gender: 'MALE', phone: '9841234508', occupation: 'Labour', membershipDate: '2078-05-30', district: 'Nuwakot', province: 'Bagmati', wardNo: '6', municipality: 'Bidur' },
+    93→    { memberNo: 'M-009', firstName: 'Sunita', lastName: 'Karki', firstNameNep: 'सुनिता', lastNameNep: 'कार्की', fatherName: 'Dinesh Karki', gender: 'FEMALE', phone: '9841234509', occupation: 'Health Worker', membershipDate: '2079-03-08', district: 'Kathmandu', province: 'Bagmati', wardNo: '8', municipality: 'Kathmandu' },
+    94→    { memberNo: 'M-010', firstName: 'Raj', lastName: 'Adhikari', firstNameNep: 'राज', lastNameNep: 'अधिकारी', fatherName: 'Bharat Adhikari', gender: 'MALE', phone: '9841234510', occupation: 'Government Service', membershipDate: '2079-09-15', district: 'Kavre', province: 'Bagmati', wardNo: '1', municipality: 'Dhulikhel' },
+    95→    { memberNo: 'M-011', firstName: 'Gita', lastName: 'Maharjan', firstNameNep: 'गीता', lastNameNep: 'महर्जन', fatherName: 'Hira Maharjan', gender: 'FEMALE', phone: '9841234511', occupation: 'Farmer', membershipDate: '2080-01-20', district: 'Lalitpur', province: 'Bagmati', wardNo: '9', municipality: 'Lalitpur' },
+    96→    { memberNo: 'M-012', firstName: 'Dipak', lastName: 'Poudel', firstNameNep: 'दीपक', lastNameNep: 'पौडेल', fatherName: 'Shyam Poudel', gender: 'MALE', phone: '9841234512', occupation: 'Student', membershipDate: '2080-06-10', district: 'Chitwan', province: 'Bagmati', wardNo: '4', municipality: 'Bharatpur' },
+    97→  ]
+    98→
+    99→  for (const m of memberData) {
+   100→    await db.member.upsert({
+   101→      where: { memberNo: m.memberNo },
+   102→      update: {},
+   103→      create: {
+   104→        memberNo: m.memberNo,
+   105→        firstName: m.firstName,
+   106→        lastName: m.lastName,
+   107→        firstNameNep: m.firstNameNep,
+   108→        lastNameNep: m.lastNameNep,
+   109→        fatherName: m.fatherName,
+   110→        gender: m.gender,
+   111→        phone: m.phone,
+   112→        occupation: m.occupation,
+   113→        membershipDate: m.membershipDate,
+   114→        district: m.district,
+   115→        province: m.province,
+   116→        wardNo: m.wardNo,
+   117→        municipality: m.municipality,
+   118→        status: 'ACTIVE',
+   119→        memberType: 'REGULAR',
+   120→        organizationId: ORG_ID,
+   121→        branchId: BRANCH_ID_MAIN,
+   122→      },
+   123→    })
+   124→  }
+   125→
+   126→  // Fetch member IDs
+   127→  const members = await db.member.findMany()
+   128→  const memberMap: Record<string, string> = {}
+   129→  for (const m of members) {
+   130→    memberMap[m.memberNo] = m.id
+   131→  }
+   132→
+   133→  // 5. Create Savings Products
+   134→  const savingsProducts = [
+   135→    { id: 'sp-SV-REG', name: 'Regular Savings', nameNepali: 'नियमित बचत', code: 'SV-REG', interestRate: 6.0, minBalance: 500, minOpeningAmt: 1000, compoundingFreq: 'QUARTERLY', isDefault: true },
+   136→    { id: 'sp-SV-FD', name: 'Fixed Deposit', nameNepali: 'मुद्दती निक्षेप', code: 'SV-FD', interestRate: 10.0, minBalance: 10000, minOpeningAmt: 10000, lockInPeriod: 12, compoundingFreq: 'QUARTERLY' },
+   137→    { id: 'sp-SV-DLY', name: 'Daily Savings', nameNepali: 'दैनिक बचत', code: 'SV-DLY', interestRate: 5.0, minBalance: 100, minOpeningAmt: 100, compoundingFreq: 'MONTHLY' },
+   138→    { id: 'sp-SV-RD', name: 'Recurring Deposit', nameNepali: 'आवर्ती निक्षेप', code: 'SV-RD', interestRate: 8.5, minBalance: 500, minOpeningAmt: 500, lockInPeriod: 6, compoundingFreq: 'QUARTERLY' },
+   139→  ]
+   140→
+   141→  for (const sp of savingsProducts) {
+   142→    await db.savingsProduct.upsert({
+   143→      where: { id: sp.id },
+   144→      update: {},
+   145→      create: {
+   146→        id: sp.id,
+   147→        name: sp.name,
+   148→        nameNepali: sp.nameNepali,
+   149→        code: sp.code,
+   150→        interestRate: sp.interestRate,
+   151→        minBalance: sp.minBalance,
+   152→        minOpeningAmt: sp.minOpeningAmt,
+   153→        lockInPeriod: sp.lockInPeriod || null,
+   154→        compoundingFreq: sp.compoundingFreq,
+   155→        isDefault: sp.isDefault || false,
+   156→        organizationId: ORG_ID,
+   157→      },
+   158→    })
+   159→  }
+   160→
+   161→  // 6. Create Savings Accounts
+   162→  const savingsAccounts = [
+   163→    { accountNo: 'SA-001', memberNo: 'M-001', productId: 'sp-SV-REG', balance: 45000, openedDate: '2075-03-15' },
+   164→    { accountNo: 'SA-002', memberNo: 'M-002', productId: 'sp-SV-REG', balance: 28000, openedDate: '2075-04-20' },
+   165→    { accountNo: 'SA-003', memberNo: 'M-003', productId: 'sp-SV-FD', balance: 100000, openedDate: '2076-01-10' },
+   166→    { accountNo: 'SA-004', memberNo: 'M-004', productId: 'sp-SV-REG', balance: 15000, openedDate: '2076-06-05' },
+   167→    { accountNo: 'SA-005', memberNo: 'M-005', productId: 'sp-SV-DLY', balance: 8500, openedDate: '2077-02-18' },
+   168→    { accountNo: 'SA-006', memberNo: 'M-006', productId: 'sp-SV-REG', balance: 62000, openedDate: '2077-08-12' },
+   169→    { accountNo: 'SA-007', memberNo: 'M-007', productId: 'sp-SV-FD', balance: 200000, openedDate: '2078-01-25' },
+   170→    { accountNo: 'SA-008', memberNo: 'M-008', productId: 'sp-SV-DLY', balance: 3200, openedDate: '2078-05-30' },
+   171→    { accountNo: 'SA-009', memberNo: 'M-009', productId: 'sp-SV-RD', balance: 36000, openedDate: '2079-03-08' },
+   172→    { accountNo: 'SA-010', memberNo: 'M-010', productId: 'sp-SV-REG', balance: 78000, openedDate: '2079-09-15' },
+   173→  ]
+   174→
+   175→  for (const sa of savingsAccounts) {
+   176→    await db.savingsAccount.upsert({
+   177→      where: { accountNo: sa.accountNo },
+   178→      update: {},
+   179→      create: {
+   180→        accountNo: sa.accountNo,
+   181→        memberId: memberMap[sa.memberNo],
+   182→        productId: sa.productId,
+   183→        balance: sa.balance,
+   184→        interestEarned: sa.balance * 0.06,
+   185→        openedDate: sa.openedDate,
+   186→        status: 'ACTIVE',
+   187→      },
+   188→    })
+   189→  }
+   190→
+   191→  // 7. Create Loan Products
+   192→  const loanProducts = [
+   193→    { id: 'lp-LN-GEN', name: 'General Loan', nameNepali: 'सामान्य ऋण', code: 'LN-GEN', interestRate: 12.0, maxAmount: 500000, minAmount: 10000, maxTerm: 60, minTerm: 6, repaymentSchedule: 'MONTHLY', guarantorRequired: true },
+   194→    { id: 'lp-LN-BIZ', name: 'Business Loan', nameNepali: 'व्यापार ऋण', code: 'LN-BIZ', interestRate: 14.0, maxAmount: 2000000, minAmount: 50000, maxTerm: 84, minTerm: 12, repaymentSchedule: 'MONTHLY', collateralRequired: true, guarantorRequired: true },
+   195→    { id: 'lp-LN-EMG', name: 'Emergency Loan', nameNepali: 'आकस्मिक ऋण', code: 'LN-EMG', interestRate: 10.0, maxAmount: 100000, minAmount: 5000, maxTerm: 24, minTerm: 3, repaymentSchedule: 'MONTHLY' },
+   196→    { id: 'lp-LN-AGR', name: 'Agriculture Loan', nameNepali: 'कृषि ऋण', code: 'LN-AGR', interestRate: 8.0, maxAmount: 500000, minAmount: 20000, maxTerm: 36, minTerm: 6, repaymentSchedule: 'QUARTERLY', guarantorRequired: true },
+   197→    { id: 'lp-LN-EDU', name: 'Education Loan', nameNepali: 'शिक्षा ऋण', code: 'LN-EDU', interestRate: 7.0, maxAmount: 300000, minAmount: 10000, maxTerm: 60, minTerm: 12, repaymentSchedule: 'MONTHLY' },
+   198→  ]
+   199→
+   200→  for (const lp of loanProducts) {
+   201→    await db.loanProduct.upsert({
+   202→      where: { id: lp.id },
+   203→      update: {},
+   204→      create: {
+   205→        id: lp.id,
+   206→        name: lp.name,
+   207→        nameNepali: lp.nameNepali,
+   208→        code: lp.code,
+   209→        interestRate: lp.interestRate,
+   210→        maxAmount: lp.maxAmount,
+   211→        minAmount: lp.minAmount,
+   212→        maxTerm: lp.maxTerm,
+   213→        minTerm: lp.minTerm,
+   214→        repaymentSchedule: lp.repaymentSchedule,
+   215→        collateralRequired: lp.collateralRequired || false,
+   216→        guarantorRequired: lp.guarantorRequired || false,
+   217→        organizationId: ORG_ID,
+   218→      },
+   219→    })
+   220→  }
+   221→
+   222→  // 8. Create Loan Applications
+   223→  const loanApps = [
+   224→    { applicationNo: 'LA-001', memberNo: 'M-001', productId: 'lp-LN-GEN', requestedAmount: 200000, approvedAmount: 200000, term: 24, purpose: 'Home renovation', status: 'DISBURSED', interestRate: 12.0, disbursedAmount: 200000, outstandingAmount: 145000, emiAmount: 9800 },
+   225→    { applicationNo: 'LA-002', memberNo: 'M-002', productId: 'lp-LN-AGR', requestedAmount: 100000, approvedAmount: 100000, term: 12, purpose: 'Vegetable farming', status: 'DISBURSED', interestRate: 8.0, disbursedAmount: 100000, outstandingAmount: 65000, emiAmount: 8700 },
+   226→    { applicationNo: 'LA-003', memberNo: 'M-006', productId: 'lp-LN-BIZ', requestedAmount: 500000, approvedAmount: 450000, term: 36, purpose: 'Expand shop', status: 'DISBURSED', interestRate: 14.0, disbursedAmount: 450000, outstandingAmount: 380000, emiAmount: 15400 },
+   227→    { applicationNo: 'LA-004', memberNo: 'M-003', productId: 'lp-LN-EDU', requestedAmount: 150000, approvedAmount: null, term: 24, purpose: 'MBA studies', status: 'PENDING', guarantorId: 'M-010' },
+   228→    { applicationNo: 'LA-005', memberNo: 'M-005', productId: 'lp-LN-EMG', requestedAmount: 50000, approvedAmount: null, term: 6, purpose: 'Medical emergency', status: 'UNDER_REVIEW' },
+   229→    { applicationNo: 'LA-006', memberNo: 'M-009', productId: 'lp-LN-GEN', requestedAmount: 80000, approvedAmount: 80000, term: 12, purpose: 'Family event', status: 'APPROVED', interestRate: 12.0 },
+   230→  ]
+   231→
+   232→  for (const la of loanApps) {
+   233→    await db.loanApplication.upsert({
+   234→      where: { applicationNo: la.applicationNo },
+   235→      update: {},
+   236→      create: {
+   237→        applicationNo: la.applicationNo,
+   238→        memberId: memberMap[la.memberNo],
+   239→        productId: la.productId,
+   240→        requestedAmount: la.requestedAmount,
+   241→        approvedAmount: la.approvedAmount,
+   242→        term: la.term,
+   243→        purpose: la.purpose,
+   244→        status: la.status,
+   245→        interestRate: la.interestRate || null,
+   246→        disbursedAmount: la.disbursedAmount || null,
+   247→        outstandingAmount: la.outstandingAmount || null,
+   248→        emiAmount: la.emiAmount || null,
+   249→        guarantorId: la.guarantorId ? memberMap[la.guarantorId] : null,
+   250→        applicationDate: '2082-01-15',
+   251→        disbursementDate: la.status === 'DISBURSED' ? '2082-02-01' : null,
+   252→      },
+   253→    })
+   254→  }
+   255→
+   256→  // 9. Create Chart of Accounts
+   257→  const accounts = [
+   258→    { code: '1000', name: 'Assets', nameNepali: 'सम्पत्ति', type: 'ASSET', subType: 'HEADER' },
+   259→    { code: '1100', name: 'Current Assets', nameNepali: 'चालु सम्पत्ति', type: 'ASSET', subType: 'HEADER' },
+   260→    { code: '1110', name: 'Cash in Hand', nameNepali: 'हातमा नगद', type: 'ASSET', subType: 'CASH' },
+   261→    { code: '1120', name: 'Bank Account', nameNepali: 'बैंक खाता', type: 'ASSET', subType: 'BANK' },
+   262→    { code: '1130', name: 'Savings Deposits', nameNepali: 'बचत निक्षेप', type: 'ASSET', subType: 'RECEIVABLE' },
+   263→    { code: '1140', name: 'Loan Receivable', nameNepali: 'ऋण प्राप्य', type: 'ASSET', subType: 'RECEIVABLE' },
+   264→    { code: '1200', name: 'Fixed Assets', nameNepali: 'स्थिर सम्पत्ति', type: 'ASSET', subType: 'HEADER' },
+   265→    { code: '1210', name: 'Land & Building', nameNepali: 'जग्गा र भवन', type: 'ASSET', subType: 'FIXED' },
+   266→    { code: '1220', name: 'Furniture & Equipment', nameNepali: 'फर्निचर र उपकरण', type: 'ASSET', subType: 'FIXED' },
+   267→    { code: '2000', name: 'Liabilities', nameNepali: 'दायित्व', type: 'LIABILITY', subType: 'HEADER' },
+   268→    { code: '2100', name: 'Member Deposits', nameNepali: 'सदस्य निक्षेप', type: 'LIABILITY', subType: 'PAYABLE' },
+   269→    { code: '2200', name: 'Share Capital', nameNepali: 'शेयर पूँजी', type: 'LIABILITY', subType: 'EQUITY' },
+   270→    { code: '2300', name: 'Reserve Fund', nameNepali: 'रिजर्भ कोष', type: 'LIABILITY', subType: 'EQUITY' },
+   271→    { code: '3000', name: 'Income', nameNepali: 'आम्दानी', type: 'INCOME', subType: 'HEADER' },
+   272→    { code: '3100', name: 'Interest Income', nameNepali: 'ब्याज आम्दानी', type: 'INCOME', subType: 'INTEREST' },
+   273→    { code: '3200', name: 'Fee Income', nameNepali: 'शुल्क आम्दानी', type: 'INCOME', subType: 'FEE' },
+   274→    { code: '3300', name: 'Other Income', nameNepali: 'अन्य आम्दानी', type: 'INCOME', subType: 'OTHER' },
+   275→    { code: '4000', name: 'Expenses', nameNepali: 'खर्च', type: 'EXPENSE', subType: 'HEADER' },
+   276→    { code: '4100', name: 'Interest Expense', nameNepali: 'ब्याज खर्च', type: 'EXPENSE', subType: 'INTEREST' },
+   277→    { code: '4200', name: 'Salary & Wages', nameNepali: 'तलब र ज्याला', type: 'EXPENSE', subType: 'SALARY' },
+   278→    { code: '4300', name: 'Office Expenses', nameNepali: 'कार्यालय खर्च', type: 'EXPENSE', subType: 'OFFICE' },
+   279→    { code: '4400', name: 'Depreciation', nameNepali: 'ह्रास', type: 'EXPENSE', subType: 'DEPRECIATION' },
+   280→    { code: '5000', name: 'Equity', nameNepali: 'इक्विटी', type: 'EQUITY', subType: 'HEADER' },
+   281→    { code: '5100', name: 'Retained Earnings', nameNepali: 'सञ्चित आम्दानी', type: 'EQUITY', subType: 'EQUITY' },
+   282→  ]
+   283→
+   284→  const accountMap: Record<string, string> = {}
+   285→  for (const acct of accounts) {
+   286→    const created = await db.account.create({
+   287→      data: {
+   288→        code: acct.code,
+   289→        name: acct.name,
+   290→        nameNepali: acct.nameNepali,
+   291→        type: acct.type,
+   292→        subType: acct.subType,
+   293→        organizationId: ORG_ID,
+   294→        isSystem: true,
+   295→      },
+   296→    })
+   297→    accountMap[acct.code] = created.id
+   298→  }
+   299→
+   300→  // Update parent references
+   301→  const parentMap: Record<string, string> = {
+   302→    '1100': '1000', '1200': '1000',
+   303→    '1110': '1100', '1120': '1100', '1130': '1100', '1140': '1100',
+   304→    '1210': '1200', '1220': '1200',
+   305→    '2100': '2000', '2200': '2000', '2300': '2000',
+   306→    '3100': '3000', '3200': '3000', '3300': '3000',
+   307→    '4100': '4000', '4200': '4000', '4300': '4000', '4400': '4000',
+   308→    '5100': '5000',
+   309→  }
+   310→
+   311→  for (const [code, parentCode] of Object.entries(parentMap)) {
+   312→    if (accountMap[code] && accountMap[parentCode]) {
+   313→      await db.account.update({
+   314→        where: { id: accountMap[code] },
+   315→        data: { parentId: accountMap[parentCode] },
+   316→      })
+   317→    }
+   318→  }
+   319→
+   320→  // 10. Create Employees
+   321→  const employees = [
+   322→    { employeeId: 'EMP-001', firstName: 'Ram', lastName: 'Bahadur', firstNameNep: 'राम', lastNameNep: 'बहादुर', position: 'Manager', department: 'Administration', salary: 45000, joinDate: '2070-01-15' },
+   323→    { employeeId: 'EMP-002', firstName: 'Sita', lastName: 'Kumari', firstNameNep: 'सीता', lastNameNep: 'कुमारी', position: 'Accountant', department: 'Finance', salary: 35000, joinDate: '2072-03-10' },
+   324→    { employeeId: 'EMP-003', firstName: 'Hari', lastName: 'Prasad', firstNameNep: 'हरि', lastNameNep: 'प्रसाद', position: 'Loan Officer', department: 'Credit', salary: 30000, joinDate: '2074-06-20' },
+   325→    { employeeId: 'EMP-004', firstName: 'Maya', lastName: 'Devi', firstNameNep: 'माया', lastNameNep: 'देवी', position: 'Teller', department: 'Operations', salary: 25000, joinDate: '2076-01-05' },
+   326→    { employeeId: 'EMP-005', firstName: 'Bikash', lastName: 'Thapa', firstNameNep: 'विकास', lastNameNep: 'थापा', position: 'Field Officer', department: 'Credit', salary: 22000, joinDate: '2078-04-15' },
+   327→    { employeeId: 'EMP-006', firstName: 'Anju', lastName: 'Rai', firstNameNep: 'अञ्जु', lastNameNep: 'राई', position: 'Cashier', department: 'Operations', salary: 23000, joinDate: '2079-02-01' },
+   328→  ]
+   329→
+   330→  for (const emp of employees) {
+   331→    await db.employee.upsert({
+   332→      where: { employeeId: emp.employeeId },
+   333→      update: {},
+   334→      create: {
+   335→        employeeId: emp.employeeId,
+   336→        firstName: emp.firstName,
+   337→        lastName: emp.lastName,
+   338→        firstNameNep: emp.firstNameNep,
+   339→        lastNameNep: emp.lastNameNep,
+   340→        position: emp.position,
+   341→        department: emp.department,
+   342→        salary: emp.salary,
+   343→        joinDate: emp.joinDate,
+   344→        status: 'ACTIVE',
+   345→        organizationId: ORG_ID,
+   346→        branchId: BRANCH_ID_MAIN,
+   347→      },
+   348→    })
+   349→  }
+   350→
+   351→  // 11. Create Share Products
+   352→  await db.shareProduct.upsert({
+   353→    where: { id: 'sp-share-001' },
+   354→    update: {},
+   355→    create: {
+   356→      id: 'sp-share-001',
+   357→      name: 'Ordinary Share',
+   358→      nameNepali: 'साधारण शेयर',
+   359→      faceValue: 100,
+   360→      totalShares: 10000,
+   361→      issuedShares: 3200,
+   362→      availableShares: 6800,
+   363→      organizationId: ORG_ID,
+   364→    },
+   365→  })
+   366→
+   367→  // 12. Create Share Holdings
+   368→  const shareHoldings = [
+   369→    { memberNo: 'M-001', shareCount: 50, shareValue: 5000 },
+   370→    { memberNo: 'M-002', shareCount: 30, shareValue: 3000 },
+   371→    { memberNo: 'M-003', shareCount: 25, shareValue: 2500 },
+   372→    { memberNo: 'M-006', shareCount: 100, shareValue: 10000 },
+   373→    { memberNo: 'M-007', shareCount: 40, shareValue: 4000 },
+   374→    { memberNo: 'M-010', shareCount: 75, shareValue: 7500 },
+   375→  ]
+   376→
+   377→  for (const sh of shareHoldings) {
+   378→    await db.shareHolding.create({
+   379→      data: {
+   380→        memberId: memberMap[sh.memberNo],
+   381→        productId: 'sp-share-001',
+   382→        shareCount: sh.shareCount,
+   383→        shareValue: sh.shareValue,
+   384→        purchaseDate: '2080-01-01',
+   385→        status: 'ACTIVE',
+   386→      },
+   387→    })
+   388→  }
+   389→
+   390→  // 13. Create Assets
+   391→  const assets = [
+   392→    { name: 'Office Building', nameNepali: 'कार्यालय भवन', code: 'AST-001', category: 'BUILDING', purchasePrice: 5000000, currentValue: 4500000, depreciationRate: 2.5, location: 'Putalisadak' },
+   393→    { name: 'Computer Set', nameNepali: 'कम्प्युटर सेट', code: 'AST-002', category: 'IT', purchasePrice: 80000, currentValue: 50000, depreciationRate: 20, location: 'Main Office' },
+   394→    { name: 'Safe Box', nameNepali: 'सेफ बक्स', code: 'AST-003', category: 'FURNITURE', purchasePrice: 150000, currentValue: 120000, depreciationRate: 10, location: 'Main Office' },
+   395→    { name: 'Office Furniture', nameNepali: 'कार्यालय फर्निचर', code: 'AST-004', category: 'FURNITURE', purchasePrice: 200000, currentValue: 150000, depreciationRate: 10, location: 'Main Office' },
+   396→    { name: 'Motorcycle', nameNepali: 'मोटरसाइकल', code: 'AST-005', category: 'VEHICLE', purchasePrice: 250000, currentValue: 180000, depreciationRate: 15, location: 'Field Office' },
+   397→  ]
+   398→
+   399→  for (const ast of assets) {
+   400→    await db.asset.upsert({
+   401→      where: { code: ast.code },
+   402→      update: {},
+   403→      create: {
+   404→        name: ast.name,
+   405→        nameNepali: ast.nameNepali,
+   406→        code: ast.code,
+   407→        category: ast.category,
+   408→        purchasePrice: ast.purchasePrice,
+   409→        currentValue: ast.currentValue,
+   410→        depreciationRate: ast.depreciationRate,
+   411→        accumulatedDep: ast.purchasePrice - ast.currentValue,
+   412→        location: ast.location,
+   413→        status: 'ACTIVE',
+   414→        organizationId: ORG_ID,
+   415→      },
+   416→    })
+   417→  }
+   418→
+   419→  // 14. Create Inventory Items
+   420→  const inventoryItems = [
+   421→    { name: 'Passbook', nameNepali: 'पासबुक', code: 'INV-001', category: 'Stationery', unit: 'PCS', quantity: 500, minStockLevel: 100, unitPrice: 25, supplier: 'Nepal Press' },
+   422→    { name: 'Voucher Book', nameNepali: 'भौचर बुक', code: 'INV-002', category: 'Stationery', unit: 'PCS', quantity: 200, minStockLevel: 50, unitPrice: 50, supplier: 'Nepal Press' },
+   423→    { name: 'Receipt Book', nameNepali: 'रसिद बुक', code: 'INV-003', category: 'Stationery', unit: 'PCS', quantity: 150, minStockLevel: 30, unitPrice: 40, supplier: 'Nepal Press' },
+   424→    { name: 'Stamp Paper', nameNepali: 'टिकट कागज', code: 'INV-004', category: 'Stationery', unit: 'PCS', quantity: 1000, minStockLevel: 200, unitPrice: 5, supplier: 'General Store' },
+   425→    { name: 'Printer Cartridge', nameNepali: 'प्रिन्टर कार्ट्रिज', code: 'INV-005', category: 'IT Supplies', unit: 'PCS', quantity: 10, minStockLevel: 3, unitPrice: 3500, supplier: 'IT Hub' },
+   426→  ]
+   427→
+   428→  for (const inv of inventoryItems) {
+   429→    await db.inventoryItem.upsert({
+   430→      where: { code: inv.code },
+   431→      update: {},
+   432→      create: {
+   433→        name: inv.name,
+   434→        nameNepali: inv.nameNepali,
+   435→        code: inv.code,
+   436→        category: inv.category,
+   437→        unit: inv.unit,
+   438→        quantity: inv.quantity,
+   439→        minStockLevel: inv.minStockLevel,
+   440→        unitPrice: inv.unitPrice,
+   441→        totalValue: inv.quantity * inv.unitPrice,
+   442→        supplier: inv.supplier,
+   443→        organizationId: ORG_ID,
+   444→      },
+   445→    })
+   446→  }
+   447→
+   448→  // 15. Create Journal Entries
+   449→  await db.journalEntry.create({
+   450→    data: {
+   451→      voucherNo: 'JE-001',
+   452→      date: '2082-01-15',
+   453→      narration: 'Opening balance entry',
+   454→      status: 'POSTED',
+   455→      entryType: 'JOURNAL',
+   456→      items: {
+   457→        create: [
+   458→          { accountId: accountMap['1110'], debit: 500000, credit: 0 },
+   459→          { accountId: accountMap['2100'], debit: 0, credit: 500000 },
+   460→        ],
+   461→      },
+   462→    },
+   463→  })
+   464→
+   465→  await db.journalEntry.create({
+   466→    data: {
+   467→      voucherNo: 'JE-002',
+   468→      date: '2082-01-20',
+   469→      narration: 'Loan disbursement',
+   470→      status: 'POSTED',
+   471→      entryType: 'PAYMENT',
+   472→      items: {
+   473→        create: [
+   474→          { accountId: accountMap['1140'], debit: 200000, credit: 0 },
+   475→          { accountId: accountMap['1110'], debit: 0, credit: 200000 },
+   476→        ],
+   477→      },
+   478→    },
+   479→  })
+   480→
+   481→  await db.journalEntry.create({
+   482→    data: {
+   483→      voucherNo: 'JE-003',
+   484→      date: '2082-02-01',
+   485→      narration: 'Salary payment',
+   486→      status: 'POSTED',
+   487→      entryType: 'PAYMENT',
+   488→      items: {
+   489→        create: [
+   490→          { accountId: accountMap['4200'], debit: 180000, credit: 0 },
+   491→          { accountId: accountMap['1110'], debit: 0, credit: 180000 },
+   492→        ],
+   493→      },
+   494→    },
+   495→  })
+   496→
+   497→  // 16. Create Meetings
+   498→  const meetings = [
+   499→    { title: 'Annual General Meeting 2082', titleNepali: 'वार्षिक आम सभा २०८२', type: 'ANNUAL_GENERAL', date: '2082-04-15', time: '10:00', venue: 'Community Hall, Putalisadak', status: 'SCHEDULED', agenda: 'Review annual report, approve budget, elect board members' },
+   500→    { title: 'Board Meeting - Ashad', titleNepali: 'बोर्ड बैठक - असार', type: 'BOARD', date: '2082-02-30', time: '14:00', venue: 'Office Conference Room', status: 'COMPLETED', agenda: 'Review loan applications, approve new policies', decisions: 'Approved 5 new loan applications, revised interest rates for FD' },
+   501→    { title: 'Center Meeting - Group A', titleNepali: 'केन्द्र बैठक - समूह ए', type: 'CENTER', date: '2082-03-05', time: '08:00', venue: 'Community Center', status: 'COMPLETED', agenda: 'Monthly savings collection, loan discussion' },
+   502→  ]
+   503→
+   504→  for (const mt of meetings) {
+   505→    await db.meeting.create({
+   506→      data: {
+   507→        title: mt.title,
+   508→        titleNepali: mt.titleNepali,
+   509→        type: mt.type,
+   510→        date: mt.date,
+   511→        time: mt.time,
+   512→        venue: mt.venue,
+   513→        status: mt.status,
+   514→        agenda: mt.agenda,
+   515→        decisions: mt.decisions || null,
+   516→        organizationId: ORG_ID,
+   517→      },
+   518→    })
+   519→  }
+   520→
+   521→  // 17. Create Fiscal Year
+   522→  await db.fiscalYear.upsert({
+   523→    where: { id: 'fy-2082' },
+   524→    update: {},
+   525→    create: {
+   526→      id: 'fy-2082',
+   527→      name: '2082/83',
+   528→      startDate: '2082-01-01',
+   529→      endDate: '2082-12-30',
+   530→      isActive: true,
+   531→      isClosed: false,
+   532→      organizationId: ORG_ID,
+   533→    },
+   534→  })
+   535→
+   536→  console.log('✅ Seeding complete! Sahakari system is ready.')
+   537→}
+   538→
+   539→main()
+   540→  .catch((e) => {
+   541→    console.error(e)
+   542→    process.exit(1)
+   543→  })
+   544→  .finally(async () => {
+   545→    await db.$disconnect()
+   546→  })
+   547→

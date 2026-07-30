@@ -1,0 +1,1620 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useState, useEffect, useCallback } from 'react'
+     4→     4→import { useNavigationStore, type ModuleKey } from '@/store/navigation-store'
+     5→     5→import { formatBSDate, toNepaliDigits, getTodayBS, getBSMonthGrid, getBSMonthDays, bsMonths, bsMonthsNep, getBSYearRange, nprToWords } from '@/lib/bs-calendar'
+     6→     6→import {
+     7→     7→  LayoutDashboard, Users, PiggyBank, HandCoins, BookOpen, UserCog,
+     8→     8→  Package, Building2, Share2, CalendarDays, BarChart3, Settings,
+     9→     9→  ChevronLeft, ChevronRight, Bell, Search, Menu, X, TrendingUp,
+    10→    10→  TrendingDown, DollarSign, CreditCard, ArrowUpRight,
+    11→    11→  ArrowDownRight, Eye, Plus, CheckCircle2,
+    12→    12→  Clock, AlertCircle, FileText, Download,
+    13→    13→  Globe, Shield, LogOut, Send, Printer, ChevronDown,
+    14→    14→  AlertTriangle, Info, CheckCircle, AlertCircleIcon, RefreshCw,
+    15→    15→  Trash2, Edit, Save, Loader2
+    16→    16→} from 'lucide-react'
+    17→    17→import {
+    18→    18→  Card, CardContent, CardDescription, CardHeader, CardTitle,
+    19→    19→  CardFooter
+    20→    20→} from '@/components/ui/card'
+    21→    21→import { Button } from '@/components/ui/button'
+    22→    22→import { Input } from '@/components/ui/input'
+    23→    23→import { Badge } from '@/components/ui/badge'
+    24→    24→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    25→    25→import {
+    26→    26→  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+    27→    27→} from '@/components/ui/table'
+    28→    28→import {
+    29→    29→  Dialog, DialogContent, DialogDescription, DialogFooter,
+    30→    30→  DialogHeader, DialogTitle, DialogTrigger
+    31→    31→} from '@/components/ui/dialog'
+    32→    32→import { Label } from '@/components/ui/label'
+    33→    33→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+    34→    34→import { Progress } from '@/components/ui/progress'
+    35→    35→import { Separator } from '@/components/ui/separator'
+    36→    36→import { ScrollArea } from '@/components/ui/scroll-area'
+    37→    37→import { Textarea } from '@/components/ui/textarea'
+    38→    38→import { Switch } from '@/components/ui/switch'
+    39→    39→import {
+    40→    40→  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+    41→    41→  ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart
+    42→    42→} from 'recharts'
+    43→    43→import { toast } from 'sonner'
+    44→    44→
+    45→    45→// ============================================================
+    46→    46→// Types
+    47→    47→// ============================================================
+    48→    48→interface DashboardData {
+    49→    49→  kpis: {
+    50→    50→    totalMembers: number; totalSavings: number; totalLoansDisbursed: number
+    51→    51→    totalOutstanding: number; totalAssets: number; totalShareCapital: number
+    52→    52→    pendingLoans: number; totalEmployees: number; totalDeposits: number; totalSalaryExpense: number
+    53→    53→  }
+    54→    54→  monthlyTrend: Array<{ month: string; savings: number; loans: number; income: number }>
+    55→    55→  loanStatusDist: Array<{ name: string; value: number; color: string }>
+    56→    56→  savingsByProduct: Array<{ name: string; total: number; count: number }>
+    57→    57→  recentActivities: Array<{ type: string; description: string; time: string; icon: string }>
+    58→    58→  members: any[]; savingsAccounts: any[]; loanApps: any[]; employees: any[]
+    59→    59→  assets: any[]; inventoryItems: any[]; shareHoldings: any[]; meetings: any[]
+    60→    60→  journalEntries: any[]; accounts: any[]
+    61→    61→}
+    62→    62→
+    63→    63→// ============================================================
+    64→    64→// Navigation Config
+    65→    65→// ============================================================
+    66→    66→const navItems: Array<{ key: ModuleKey; label: string; labelNep: string; icon: any; color: string }> = [
+    67→    67→  { key: 'dashboard', label: 'Dashboard', labelNep: 'ड्यासबोर्ड', icon: LayoutDashboard, color: 'text-emerald-600' },
+    68→    68→  { key: 'members', label: 'Members', labelNep: 'सदस्य', icon: Users, color: 'text-blue-600' },
+    69→    69→  { key: 'savings', label: 'Savings', labelNep: 'बचत', icon: PiggyBank, color: 'text-amber-600' },
+    70→    70→  { key: 'loans', label: 'Loans', labelNep: 'ऋण', icon: HandCoins, color: 'text-rose-600' },
+    71→    71→  { key: 'accounting', label: 'Accounting', labelNep: 'लेखा', icon: BookOpen, color: 'text-purple-600' },
+    72→    72→  { key: 'hr', label: 'HR & Payroll', labelNep: 'मानव संसाधन', icon: UserCog, color: 'text-teal-600' },
+    73→    73→  { key: 'inventory', label: 'Inventory', labelNep: 'सूची', icon: Package, color: 'text-orange-600' },
+    74→    74→  { key: 'assets', label: 'Assets', labelNep: 'सम्पत्ति', icon: Building2, color: 'text-cyan-600' },
+    75→    75→  { key: 'shares', label: 'Shares', labelNep: 'शेयर', icon: Share2, color: 'text-indigo-600' },
+    76→    76→  { key: 'meetings', label: 'Meetings', labelNep: 'बैठक', icon: CalendarDays, color: 'text-pink-600' },
+    77→    77→  { key: 'reports', label: 'Reports', labelNep: 'प्रतिवेदन', icon: BarChart3, color: 'text-slate-600' },
+    78→    78→  { key: 'settings', label: 'Settings', labelNep: 'सेटिङ', icon: Settings, color: 'text-gray-600' },
+    79→    79→]
+    80→    80→
+    81→    81→// ============================================================
+    82→    82→// Helpers
+    83→    83→// ============================================================
+    84→    84→const formatNPR = (amount: number) => `NPR ${amount.toLocaleString('en-NP')}`
+    85→    85→const statusColor = (status: string) => {
+    86→    86→  const map: Record<string, string> = {
+    87→    87→    ACTIVE: 'bg-emerald-100 text-emerald-800', DISBURSED: 'bg-emerald-100 text-emerald-800',
+    88→    88→    APPROVED: 'bg-blue-100 text-blue-800', PAID: 'bg-emerald-100 text-emerald-800',
+    89→    89→    COMPLETED: 'bg-emerald-100 text-emerald-800', POSTED: 'bg-emerald-100 text-emerald-800',
+    90→    90→    PENDING: 'bg-amber-100 text-amber-800', UNDER_REVIEW: 'bg-purple-100 text-purple-800',
+    91→    91→    SCHEDULED: 'bg-blue-100 text-blue-800', DRAFT: 'bg-gray-100 text-gray-800',
+    92→    92→    INACTIVE: 'bg-gray-100 text-gray-800', CLOSED: 'bg-gray-100 text-gray-800',
+    93→    93→    REJECTED: 'bg-red-100 text-red-800', CANCELLED: 'bg-red-100 text-red-800',
+    94→    94→    OVERDUE: 'bg-red-100 text-red-800', FROZEN: 'bg-cyan-100 text-cyan-800',
+    95→    95→    DORMANT: 'bg-gray-100 text-gray-800', SUSPENDED: 'bg-red-100 text-red-800',
+    96→    96→  }
+    97→    97→  return map[status] || 'bg-gray-100 text-gray-800'
+    98→    98→}
+    99→    99→
+   100→   100→// ============================================================
+   101→   101→// BS DATE PICKER COMPONENT
+   102→   102→// ============================================================
+   103→   103→function BSDatePicker({ value, onChange, label }: { value: string; onChange: (v: string) => void; label?: string }) {
+   104→   104→  const [open, setOpen] = useState(false)
+   105→   105→  const parts = value ? value.split('-').map(Number) : [2082, 1, 1]
+   106→   106→  const [year, setYear] = useState(parts[0])
+   107→   107→  const [month, setMonth] = useState(parts[1])
+   108→   108→  const [day, setDay] = useState(parts[2])
+   109→   109→  const years = getBSYearRange()
+   110→   110→
+   111→   111→  const formatted = value ? formatBSDate(value) : { en: 'Select Date', nep: 'मिति छान्नुहोस्' }
+   112→   112→  const grid = getBSMonthGrid(year, month)
+   113→   113→  const maxDays = getBSMonthDays(year, month)
+   114→   114→
+   115→   115→  const selectDay = (d: number) => {
+   116→   116→    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+   117→   117→    onChange(dateStr)
+   118→   118→    setOpen(false)
+   119→   119→  }
+   120→   120→
+   121→   121→  return (
+   122→   122→    <div className="space-y-1">
+   123→   123→      {label && <Label className="text-xs">{label}</Label>}
+   124→   124→      <div className="relative">
+   125→   125→        <button
+   126→   126→          onClick={() => setOpen(!open)}
+   127→   127→          className="w-full flex items-center justify-between px-3 py-2 border rounded-lg bg-white text-sm text-left hover:border-emerald-400 transition-colors"
+   128→   128→        >
+   129→   129→          <div>
+   130→   130→            <span className="text-gray-900">{formatted.en}</span>
+   131→   131→            <span className="text-gray-400 ml-2 text-xs">({formatted.nep})</span>
+   132→   132→          </div>
+   133→   133→          <CalendarDays className="w-4 h-4 text-gray-400" />
+   134→   134→        </button>
+   135→   135→        {open && (
+   136→   136→          <div className="absolute top-full mt-1 left-0 z-50 bg-white border rounded-xl shadow-xl p-4 w-80">
+   137→   137→            <div className="flex items-center gap-2 mb-3">
+   138→   138→              <Select value={String(year)} onValueChange={v => { setYear(Number(v)); setDay(1) }}>
+   139→   139→                <SelectTrigger className="w-24 h-8 text-xs"><SelectValue /></SelectTrigger>
+   140→   140→                <SelectContent>
+   141→   141→                  {years.map(y => <SelectItem key={y} value={String(y)}>{toNepaliDigits(y)}</SelectItem>)}
+   142→   142→                </SelectContent>
+   143→   143→              </Select>
+   144→   144→              <Select value={String(month)} onValueChange={v => { setMonth(Number(v)); setDay(1) }}>
+   145→   145→                <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
+   146→   146→                <SelectContent>
+   147→   147→                  {bsMonths.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m} ({bsMonthsNep[i]})</SelectItem>)}
+   148→   148→                </SelectContent>
+   149→   149→              </Select>
+   150→   150→            </div>
+   151→   151→            <div className="grid grid-cols-7 gap-0.5 text-center mb-1">
+   152→   152→              {['आ', 'सो', 'मं', 'बु', 'बि', 'शु', 'श'].map((d, i) => (
+   153→   153→                <div key={i} className="text-xs text-gray-400 py-1 font-medium">{d}</div>
+   154→   154→              ))}
+   155→   155→            </div>
+   156→   156→            <div className="grid grid-cols-7 gap-0.5">
+   157→   157→              {grid.flat().map((d, i) => (
+   158→   158→                <button
+   159→   159→                  key={i}
+   160→   160→                  disabled={!d}
+   161→   161→                  onClick={() => d && selectDay(d)}
+   162→   162→                  className={`h-8 w-8 rounded-lg text-xs flex items-center justify-center transition-colors ${
+   163→   163→                    d === day && month === parts[1] && year === parts[0]
+   164→   164→                      ? 'bg-emerald-600 text-white font-bold'
+   165→   165→                      : d ? 'hover:bg-emerald-50 text-gray-700' : 'text-transparent'
+   166→   166→                  }`}
+   167→   167→                >
+   168→   168→                  {d ? toNepaliDigits(d) : ''}
+   169→   169→                </button>
+   170→   170→              ))}
+   171→   171→            </div>
+   172→   172→            <div className="mt-3 pt-2 border-t flex justify-between items-center">
+   173→   173→              <span className="text-xs text-gray-400">{bsMonths[month - 1]} {year} - {toNepaliDigits(maxDays)} days</span>
+   174→   174→              <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => { onChange(getTodayBS()); setOpen(false) }}>Today</Button>
+   175→   175→            </div>
+   176→   176→          </div>
+   177→   177→        )}
+   178→   178→      </div>
+   179→   179→    </div>
+   180→   180→  )
+   181→   181→}
+   182→   182→
+   183→   183→// ============================================================
+   184→   184→// NOTIFICATION PANEL
+   185→   185→// ============================================================
+   186→   186→function NotificationPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+   187→   187→  const [notifications, setNotifications] = useState<any[]>([])
+   188→   188→  const [loading, setLoading] = useState(false)
+   189→   189→
+   190→   190→  useEffect(() => {
+   191→   191→    if (open) {
+   192→   192→      fetch('/api/notifications')
+   193→   193→        .then(r => r.json())
+   194→   194→        .then(d => { setNotifications(Array.isArray(d) ? d : []) })
+   195→   195→        .catch(() => {})
+   196→   196→    }
+   197→   197→  }, [open])
+   198→   198→
+   199→   199→  if (!open) return null
+   200→   200→
+   201→   201→  const severityIcon = (s: string) => {
+   202→   202→    if (s === 'ERROR') return <AlertCircle className="w-4 h-4 text-red-500" />
+   203→   203→    if (s === 'WARNING') return <AlertTriangle className="w-4 h-4 text-amber-500" />
+   204→   204→    if (s === 'SUCCESS') return <CheckCircle className="w-4 h-4 text-emerald-500" />
+   205→   205→    return <Info className="w-4 h-4 text-blue-500" />
+   206→   206→  }
+   207→   207→
+   208→   208→  return (
+   209→   209→    <div className="fixed inset-0 z-50 flex justify-end">
+   210→   210→      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+   211→   211→      <div className="relative w-full max-w-md bg-white shadow-2xl h-full overflow-y-auto">
+   212→   212→        <div className="sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between z-10">
+   213→   213→          <div>
+   214→   214→            <h3 className="font-semibold text-gray-900">Notifications</h3>
+   215→   215→            <p className="text-xs text-gray-500">सूचना तथा चेतावनी</p>
+   216→   216→          </div>
+   217→   217→          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100"><X className="w-5 h-5" /></button>
+   218→   218→        </div>
+   219→   219→        <div className="p-4 space-y-3">
+   220→   220→          {loading ? (
+   221→   221→            <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-emerald-600" /></div>
+   222→   222→          ) : notifications.length === 0 ? (
+   223→   223→            <div className="text-center py-12 text-gray-400"><Bell className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>No notifications</p></div>
+   224→   224→          ) : (
+   225→   225→            notifications.map((n, i) => (
+   226→   226→              <div key={n.id || i} className={`p-3 rounded-lg border ${
+   227→   227→                n.severity === 'ERROR' ? 'border-red-200 bg-red-50' :
+   228→   228→                n.severity === 'WARNING' ? 'border-amber-200 bg-amber-50' :
+   229→   229→                n.severity === 'SUCCESS' ? 'border-emerald-200 bg-emerald-50' :
+   230→   230→                'border-blue-200 bg-blue-50'
+   231→   231→              }`}>
+   232→   232→                <div className="flex items-start gap-2">
+   233→   233→                  {severityIcon(n.severity)}
+   234→   234→                  <div className="flex-1 min-w-0">
+   235→   235→                    <p className="text-sm font-medium text-gray-900">{n.title}</p>
+   236→   236→                    <p className="text-xs text-gray-600 mt-0.5">{n.message}</p>
+   237→   237→                    <p className="text-xs text-gray-400 mt-0.5">{n.messageNep}</p>
+   238→   238→                    {n.action === 'SEND_SMS' && (
+   239→   239→                      <Button size="sm" variant="outline" className="mt-2 h-7 text-xs" onClick={() => toast.success('SMS sent to member')}>
+   240→   240→                        <Send className="w-3 h-3 mr-1" /> Send SMS
+   241→   241→                      </Button>
+   242→   242→                    )}
+   243→   243→                  </div>
+   244→   244→                </div>
+   245→   245→              </div>
+   246→   246→            ))
+   247→   247→          )}
+   248→   248→        </div>
+   249→   249→      </div>
+   250→   250→    </div>
+   251→   251→  )
+   252→   252→}
+   253→   253→
+   254→   254→// ============================================================
+   255→   255→// LOGIN PAGE
+   256→   256→// ============================================================
+   257→   257→function LoginPage({ onLogin }: { onLogin: () => void }) {
+   258→   258→  const [email, setEmail] = useState('admin@janatasahakari.org.np')
+   259→   259→  const [password, setPassword] = useState('admin123')
+   260→   260→  const [loading, setLoading] = useState(false)
+   261→   261→  const [error, setError] = useState('')
+   262→   262→
+   263→   263→  const handleLogin = async () => {
+   264→   264→    setLoading(true)
+   265→   265→    setError('')
+   266→   266→    // Simulate authentication
+   267→   267→    await new Promise(r => setTimeout(r, 800))
+   268→   268→    if (email === 'admin@janatasahakari.org.np' && password === 'admin123') {
+   269→   269→      onLogin()
+   270→   270→    } else {
+   271→   271→      setError('Invalid credentials. Try admin@janatasahakari.org.np / admin123')
+   272→   272→    }
+   273→   273→    setLoading(false)
+   274→   274→  }
+   275→   275→
+   276→   276→  return (
+   277→   277→    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 p-4">
+   278→   278→      <div className="w-full max-w-md">
+   279→   279→        <div className="text-center mb-8">
+   280→   280→          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mx-auto mb-4 shadow-lg">
+   281→   281→            <span className="text-white font-bold text-3xl">S</span>
+   282→   282→          </div>
+   283→   283→          <h1 className="text-3xl font-bold text-gray-900">Sahakari System</h1>
+   284→   284→          <p className="text-emerald-600 mt-1">सहकारी व्यवस्थापन प्रणाली</p>
+   285→   285→          <p className="text-gray-500 text-sm mt-1">Nepal Cooperative Banking Management</p>
+   286→   286→        </div>
+   287→   287→
+   288→   288→        <Card className="border-0 shadow-xl">
+   289→   289→          <CardHeader className="pb-2">
+   290→   290→            <CardTitle className="text-lg">Sign In</CardTitle>
+   291→   291→            <CardDescription>Enter your credentials to access the system</CardDescription>
+   292→   292→          </CardHeader>
+   293→   293→          <CardContent className="space-y-4">
+   294→   294→            {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
+   295→   295→            <div className="space-y-2">
+   296→   296→              <Label>Email</Label>
+   297→   297→              <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@sahakari.org.np" />
+   298→   298→            </div>
+   299→   299→            <div className="space-y-2">
+   300→   300→              <Label>Password</Label>
+   301→   301→              <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter password" onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+   302→   302→            </div>
+   303→   303→            <div className="flex items-center justify-between">
+   304→   304→              <div className="flex items-center gap-2">
+   305→   305→                <Switch id="remember" checked={true} />
+   306→   306→                <Label htmlFor="remember" className="text-xs text-gray-500">Remember me</Label>
+   307→   307→              </div>
+   308→   308→              <button className="text-xs text-emerald-600 hover:underline">Forgot password?</button>
+   309→   309→            </div>
+   310→   310→          </CardContent>
+   311→   311→          <CardFooter>
+   312→   312→            <Button className="w-full bg-emerald-600 hover:bg-emerald-700" onClick={handleLogin} disabled={loading}>
+   313→   313→              {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+   314→   314→              {loading ? 'Signing in...' : 'Sign In'}
+   315→   315→            </Button>
+   316→   316→          </CardFooter>
+   317→   317→        </Card>
+   318→   318→
+   319→   319→        <div className="text-center mt-6 text-xs text-gray-400">
+   320→   320→          <p>Demo: admin@janatasahakari.org.np / admin123</p>
+   321→   321→          <p className="mt-1">Sahakari System v1.0 | Cooperative Act 2047 Compliant</p>
+   322→   322→        </div>
+   323→   323→      </div>
+   324→   324→    </div>
+   325→   325→  )
+   326→   326→}
+   327→   327→
+   328→   328→// ============================================================
+   329→   329→// MAIN APP
+   330→   330→// ============================================================
+   331→   331→export default function SahakariApp() {
+   332→   332→  const [isLoggedIn, setIsLoggedIn] = useState(false)
+   333→   333→  const { activeModule, setActiveModule, sidebarOpen, setSidebarOpen } = useNavigationStore()
+   334→   334→  const [data, setData] = useState<DashboardData | null>(null)
+   335→   335→  const [loading, setLoading] = useState(true)
+   336→   336→  const [searchQuery, setSearchQuery] = useState('')
+   337→   337→  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+   338→   338→  const [notifOpen, setNotifOpen] = useState(false)
+   339→   339→
+   340→   340→  const loadData = useCallback(() => {
+   341→   341→    setLoading(true)
+   342→   342→    fetch('/api/dashboard')
+   343→   343→      .then(res => res.json())
+   344→   344→      .then(d => { setData(d); setLoading(false) })
+   345→   345→      .catch(() => setLoading(false))
+   346→   346→  }, [])
+   347→   347→
+   348→   348→  useEffect(() => { if (isLoggedIn) { fetch('/api/dashboard').then(r => r.json()).then(d => { setData(d); setLoading(false) }).catch(() => setLoading(false)) } }, [isLoggedIn])
+   349→   349→
+   350→   350→  if (!isLoggedIn) return <LoginPage onLogin={() => setIsLoggedIn(true)} />
+   351→   351→
+   352→   352→  if (loading || !data) {
+   353→   353→    return (
+   354→   354→      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+   355→   355→        <div className="text-center">
+   356→   356→          <Loader2 className="w-12 h-12 mx-auto text-emerald-600 animate-spin mb-4" />
+   357→   357→          <h2 className="text-xl font-bold text-gray-900">Loading Sahakari System...</h2>
+   358→   358→          <p className="text-gray-500 text-sm mt-1">सहकारी प्रणाली लोड हुँदैछ...</p>
+   359→   359→        </div>
+   360→   360→      </div>
+   361→   361→    )
+   362→   362→  }
+   363→   363→
+   364→   364→  return (
+   365→   365→    <div className="min-h-screen bg-gray-50 flex">
+   366→   366→      {/* Sidebar */}
+   367→   367→      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-white border-r border-gray-200 flex flex-col transition-all duration-300 fixed h-full z-40 lg:relative ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+   368→   368→        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+   369→   369→          <div className="flex items-center gap-3">
+   370→   370→            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0">
+   371→   371→              <span className="text-white font-bold text-lg">S</span>
+   372→   372→            </div>
+   373→   373→            {sidebarOpen && (
+   374→   374→              <div className="overflow-hidden">
+   375→   375→                <h1 className="font-bold text-gray-900 text-sm leading-tight">Sahakari System</h1>
+   376→   376→                <p className="text-xs text-gray-500">सहकारी व्यवस्थापन</p>
+   377→   377→              </div>
+   378→   378→            )}
+   379→   379→          </div>
+   380→   380→          <button className="lg:hidden p-1 rounded hover:bg-gray-100" onClick={() => setMobileMenuOpen(false)}>
+   381→   381→            <X className="w-5 h-5 text-gray-500" />
+   382→   382→          </button>
+   383→   383→        </div>
+   384→   384→
+   385→   385→        <ScrollArea className="flex-1 py-3">
+   386→   386→          <nav className="space-y-1 px-2">
+   387→   387→            {navItems.map(item => (
+   388→   388→              <button
+   389→   389→                key={item.key}
+   390→   390→                onClick={() => { setActiveModule(item.key); setMobileMenuOpen(false) }}
+   391→   391→                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${
+   392→   392→                  activeModule === item.key ? 'bg-emerald-50 text-emerald-700 font-medium shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+   393→   393→                }`}
+   394→   394→                title={item.label}
+   395→   395→              >
+   396→   396→                <item.icon className={`w-5 h-5 flex-shrink-0 ${activeModule === item.key ? 'text-emerald-600' : item.color}`} />
+   397→   397→                {sidebarOpen && (
+   398→   398→                  <div className="flex-1 text-left">
+   399→   399→                    <span>{item.label}</span>
+   400→   400→                    <span className="block text-xs text-gray-400">{item.labelNep}</span>
+   401→   401→                  </div>
+   402→   402→                )}
+   403→   403→              </button>
+   404→   404→            ))}
+   405→   405→          </nav>
+   406→   406→        </ScrollArea>
+   407→   407→
+   408→   408→        <div className="p-3 border-t border-gray-100 space-y-2">
+   409→   409→          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="w-full hidden lg:flex items-center justify-center gap-2 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-600 text-sm transition-colors">
+   410→   410→            {sidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+   411→   411→            {sidebarOpen && <span>Collapse</span>}
+   412→   412→          </button>
+   413→   413→          <button onClick={() => { setIsLoggedIn(false); toast.success('Logged out successfully') }} className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-sm transition-colors">
+   414→   414→            <LogOut className="w-4 h-4" />
+   415→   415→            {sidebarOpen && <span>Logout</span>}
+   416→   416→          </button>
+   417→   417→        </div>
+   418→   418→      </aside>
+   419→   419→
+   420→   420→      {/* Mobile Overlay */}
+   421→   421→      {mobileMenuOpen && <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setMobileMenuOpen(false)} />}
+   422→   422→
+   423→   423→      {/* Notification Panel */}
+   424→   424→      <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
+   425→   425→
+   426→   426→      {/* Main Content */}
+   427→   427→      <main className="flex-1 min-h-screen flex flex-col">
+   428→   428→        <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-3 flex items-center gap-4 sticky top-0 z-20">
+   429→   429→          <button className="lg:hidden" onClick={() => setMobileMenuOpen(true)}>
+   430→   430→            <Menu className="w-6 h-6 text-gray-600" />
+   431→   431→          </button>
+   432→   432→          <div className="flex-1 max-w-md">
+   433→   433→            <div className="relative">
+   434→   434→              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+   435→   435→              <Input placeholder="Search members, accounts, loans..." className="pl-10 bg-gray-50 border-gray-200" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+   436→   436→            </div>
+   437→   437→          </div>
+   438→   438→          <div className="flex items-center gap-3">
+   439→   439→            <button className="relative p-2 rounded-lg hover:bg-gray-100" onClick={() => setNotifOpen(true)}>
+   440→   440→              <Bell className="w-5 h-5 text-gray-600" />
+   441→   441→              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+   442→   442→            </button>
+   443→   443→            <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-gray-200">
+   444→   444→              <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+   445→   445→                <span className="text-emerald-700 font-medium text-sm">RS</span>
+   446→   446→              </div>
+   447→   447→              <div className="hidden md:block">
+   448→   448→                <p className="text-sm font-medium text-gray-900">Ram B. Shrestha</p>
+   449→   449→                <p className="text-xs text-gray-500">Admin | {getTodayBS()}</p>
+   450→   450→              </div>
+   451→   451→            </div>
+   452→   452→          </div>
+   453→   453→        </header>
+   454→   454→
+   455→   455→        <div className="flex-1 p-4 lg:p-6 overflow-auto">
+   456→   456→          {activeModule === 'dashboard' && <DashboardModule data={data} />}
+   457→   457→          {activeModule === 'members' && <MembersModule data={data} onRefresh={loadData} />}
+   458→   458→          {activeModule === 'savings' && <SavingsModule data={data} onRefresh={loadData} />}
+   459→   459→          {activeModule === 'loans' && <LoansModule data={data} onRefresh={loadData} />}
+   460→   460→          {activeModule === 'accounting' && <AccountingModule data={data} onRefresh={loadData} />}
+   461→   461→          {activeModule === 'hr' && <HRModule data={data} onRefresh={loadData} />}
+   462→   462→          {activeModule === 'inventory' && <InventoryModule data={data} onRefresh={loadData} />}
+   463→   463→          {activeModule === 'assets' && <AssetsModule data={data} onRefresh={loadData} />}
+   464→   464→          {activeModule === 'shares' && <SharesModule data={data} onRefresh={loadData} />}
+   465→   465→          {activeModule === 'meetings' && <MeetingsModule data={data} onRefresh={loadData} />}
+   466→   466→          {activeModule === 'reports' && <ReportsModule data={data} />}
+   467→   467→          {activeModule === 'settings' && <SettingsModule data={data} />}
+   468→   468→        </div>
+   469→   469→
+   470→   470→        <footer className="bg-white border-t border-gray-200 px-4 py-3 text-center">
+   471→   471→          <p className="text-xs text-gray-500">
+   472→   472→            Sahakari System v1.0 | Janata Sahakari Sanstha Ltd. | जनता सहकारी संस्था लि. | FY {toNepaliDigits('2082/83')}
+   473→   473→          </p>
+   474→   474→        </footer>
+   475→   475→      </main>
+   476→   476→    </div>
+   477→   477→  )
+   478→   478→}
+   479→   479→
+   480→   480→// ============================================================
+   481→   481→// DASHBOARD MODULE
+   482→   482→// ============================================================
+   483→   483→function DashboardModule({ data }: { data: DashboardData }) {
+   484→   484→  const { kpis, monthlyTrend, loanStatusDist, savingsByProduct, recentActivities } = data
+   485→   485→  const todayBS = getTodayBS()
+   486→   486→
+   487→   487→  const kpiCards = [
+   488→   488→    { title: 'Total Members', titleNep: 'कुल सदस्य', value: kpis.totalMembers, icon: Users, color: 'from-blue-500 to-blue-600', change: '+12%', up: true },
+   489→   489→    { title: 'Total Savings', titleNep: 'कुल बचत', value: formatNPR(kpis.totalSavings), icon: PiggyBank, color: 'from-amber-500 to-amber-600', change: '+8.5%', up: true },
+   490→   490→    { title: 'Loans Disbursed', titleNep: 'ऋण वितरण', value: formatNPR(kpis.totalLoansDisbursed), icon: HandCoins, color: 'from-rose-500 to-rose-600', change: '+15%', up: true },
+   491→   491→    { title: 'Outstanding', titleNep: 'बक्यौता', value: formatNPR(kpis.totalOutstanding), icon: CreditCard, color: 'from-purple-500 to-purple-600', change: '-3%', up: false },
+   492→   492→    { title: 'Total Assets', titleNep: 'कुल सम्पत्ति', value: formatNPR(kpis.totalAssets), icon: Building2, color: 'from-emerald-500 to-emerald-600', change: '+5%', up: true },
+   493→   493→    { title: 'Share Capital', titleNep: 'शेयर पूँजी', value: formatNPR(kpis.totalShareCapital), icon: Share2, color: 'from-indigo-500 to-indigo-600', change: '+2%', up: true },
+   494→   494→  ]
+   495→   495→
+   496→   496→  return (
+   497→   497→    <div className="space-y-6">
+   498→   498→      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-6 text-white relative overflow-hidden">
+   499→   499→        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+   500→   500→        <div className="relative z-10">
+   501→   501→          <h2 className="text-2xl font-bold">Welcome to Janata Sahakari Sanstha</h2>
+   502→   502→          <p className="text-emerald-100 mt-1">जनता सहकारी संस्था लि. - Putalisadak, Kathmandu</p>
+   503→   503→          <div className="flex items-center gap-4 mt-4 flex-wrap">
+   504→   504→            <Badge className="bg-white/20 text-white border-0">FY: {toNepaliDigits('2082/83')}</Badge>
+   505→   505→            <Badge className="bg-white/20 text-white border-0">आज: {formatBSDate(todayBS).nep}</Badge>
+   506→   506→            <Badge className="bg-amber-400/30 text-amber-100 border-0">{kpis.pendingLoans} Pending Loans</Badge>
+   507→   507→          </div>
+   508→   508→        </div>
+   509→   509→      </div>
+   510→   510→
+   511→   511→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+   512→   512→        {kpiCards.map((kpi, i) => (
+   513→   513→          <Card key={i} className="relative overflow-hidden border-0 shadow-sm hover:shadow-md transition-shadow">
+   514→   514→            <div className={`absolute top-0 left-0 w-1 h-full bg-gradient-to-b ${kpi.color}`}></div>
+   515→   515→            <CardContent className="p-4 pl-5">
+   516→   516→              <div className="flex items-start justify-between">
+   517→   517→                <div>
+   518→   518→                  <p className="text-xs text-gray-500 font-medium">{kpi.title}</p>
+   519→   519→                  <p className="text-xs text-gray-400">{kpi.titleNep}</p>
+   520→   520→                  <p className="text-lg font-bold text-gray-900 mt-1">{kpi.value}</p>
+   521→   521→                </div>
+   522→   522→                <div className={`p-2 rounded-lg bg-gradient-to-br ${kpi.color}`}><kpi.icon className="w-4 h-4 text-white" /></div>
+   523→   523→              </div>
+   524→   524→              <div className="flex items-center gap-1 mt-2">
+   525→   525→                {kpi.up ? <TrendingUp className="w-3 h-3 text-emerald-500" /> : <TrendingDown className="w-3 h-3 text-red-500" />}
+   526→   526→                <span className={`text-xs font-medium ${kpi.up ? 'text-emerald-600' : 'text-red-600'}`}>{kpi.change}</span>
+   527→   527→                <span className="text-xs text-gray-400">vs last month</span>
+   528→   528→              </div>
+   529→   529→            </CardContent>
+   530→   530→          </Card>
+   531→   531→        ))}
+   532→   532→      </div>
+   533→   533→
+   534→   534→      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+   535→   535→        <Card className="lg:col-span-2 border-0 shadow-sm">
+   536→   536→          <CardHeader className="pb-2">
+   537→   537→            <CardTitle className="text-base">Monthly Trend</CardTitle>
+   538→   538→            <CardDescription>Savings, Loans & Income (मासिक प्रवृत्ति)</CardDescription>
+   539→   539→          </CardHeader>
+   540→   540→          <CardContent>
+   541→   541→            <ResponsiveContainer width="100%" height={300}>
+   542→   542→              <AreaChart data={monthlyTrend}>
+   543→   543→                <defs>
+   544→   544→                  <linearGradient id="colorSavings" x1="0" y1="0" x2="0" y2="1">
+   545→   545→                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+   546→   546→                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+   547→   547→                  </linearGradient>
+   548→   548→                  <linearGradient id="colorLoans" x1="0" y1="0" x2="0" y2="1">
+   549→   549→                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3} />
+   550→   550→                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
+   551→   551→                  </linearGradient>
+   552→   552→                </defs>
+   553→   553→                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+   554→   554→                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+   555→   555→                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} />
+   556→   556→                <Tooltip formatter={(value: number) => formatNPR(value)} />
+   557→   557→                <Legend />
+   558→   558→                <Area type="monotone" dataKey="savings" stroke="#10b981" fill="url(#colorSavings)" strokeWidth={2} name="Savings" />
+   559→   559→                <Area type="monotone" dataKey="loans" stroke="#f43f5e" fill="url(#colorLoans)" strokeWidth={2} name="Loans" />
+   560→   560→                <Line type="monotone" dataKey="income" stroke="#6366f1" strokeWidth={2} name="Income" />
+   561→   561→              </AreaChart>
+   562→   562→            </ResponsiveContainer>
+   563→   563→          </CardContent>
+   564→   564→        </Card>
+   565→   565→
+   566→   566→        <Card className="border-0 shadow-sm">
+   567→   567→          <CardHeader className="pb-2">
+   568→   568→            <CardTitle className="text-base">Loan Status</CardTitle>
+   569→   569→            <CardDescription>ऋण स्थिति</CardDescription>
+   570→   570→          </CardHeader>
+   571→   571→          <CardContent>
+   572→   572→            <ResponsiveContainer width="100%" height={250}>
+   573→   573→              <PieChart>
+   574→   574→                <Pie data={loanStatusDist} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value">
+   575→   575→                  {loanStatusDist.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+   576→   576→                </Pie>
+   577→   577→                <Tooltip />
+   578→   578→              </PieChart>
+   579→   579→            </ResponsiveContainer>
+   580→   580→            <div className="flex flex-wrap justify-center gap-3 mt-2">
+   581→   581→              {loanStatusDist.map((item, i) => (
+   582→   582→                <div key={i} className="flex items-center gap-1.5 text-xs">
+   583→   583→                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></div>
+   584→   584→                  <span className="text-gray-600">{item.name}: {item.value}</span>
+   585→   585→                </div>
+   586→   586→              ))}
+   587→   587→            </div>
+   588→   588→          </CardContent>
+   589→   589→        </Card>
+   590→   590→      </div>
+   591→   591→
+   592→   592→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+   593→   593→        <Card className="border-0 shadow-sm">
+   594→   594→          <CardHeader className="pb-2">
+   595→   595→            <CardTitle className="text-base">Savings by Product</CardTitle>
+   596→   596→            <CardDescription>बचत उत्पादन अनुसार</CardDescription>
+   597→   597→          </CardHeader>
+   598→   598→          <CardContent>
+   599→   599→            <ResponsiveContainer width="100%" height={250}>
+   600→   600→              <BarChart data={savingsByProduct}>
+   601→   601→                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+   602→   602→                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+   603→   603→                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} />
+   604→   604→                <Tooltip formatter={(value: number) => formatNPR(value)} />
+   605→   605→                <Bar dataKey="total" fill="#10b981" radius={[4, 4, 0, 0]} name="Total Balance" />
+   606→   606→              </BarChart>
+   607→   607→            </ResponsiveContainer>
+   608→   608→          </CardContent>
+   609→   609→        </Card>
+   610→   610→
+   611→   611→        <Card className="border-0 shadow-sm">
+   612→   612→          <CardHeader className="pb-2">
+   613→   613→            <CardTitle className="text-base">Recent Activities</CardTitle>
+   614→   614→            <CardDescription>भर्खरको गतिविधि</CardDescription>
+   615→   615→          </CardHeader>
+   616→   616→          <CardContent>
+   617→   617→            <div className="space-y-3">
+   618→   618→              {recentActivities.map((act, i) => (
+   619→   619→                <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+   620→   620→                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+   621→   621→                    act.icon === 'deposit' ? 'bg-emerald-100 text-emerald-600' :
+   622→   622→                    act.icon === 'loan' ? 'bg-rose-100 text-rose-600' :
+   623→   623→                    act.icon === 'member' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'
+   624→   624→                  }`}>
+   625→   625→                    {act.icon === 'deposit' ? <PiggyBank className="w-4 h-4" /> : act.icon === 'loan' ? <HandCoins className="w-4 h-4" /> : act.icon === 'member' ? <Users className="w-4 h-4" /> : <CalendarDays className="w-4 h-4" />}
+   626→   626→                  </div>
+   627→   627→                  <div className="flex-1 min-w-0">
+   628→   628→                    <p className="text-sm text-gray-900">{act.description}</p>
+   629→   629→                    <p className="text-xs text-gray-500 mt-0.5">{act.time}</p>
+   630→   630→                  </div>
+   631→   631→                </div>
+   632→   632→              ))}
+   633→   633→            </div>
+   634→   634→          </CardContent>
+   635→   635→        </Card>
+   636→   636→      </div>
+   637→   637→
+   638→   638→      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+   639→   639→        {navItems.slice(1, 6).map(item => (
+   640→   640→          <Card key={item.key} className="cursor-pointer hover:shadow-md transition-all border-0 shadow-sm group" onClick={() => useNavigationStore.getState().setActiveModule(item.key)}>
+   641→   641→            <CardContent className="p-4 text-center">
+   642→   642→              <div className={`w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center bg-gray-50 group-hover:scale-110 transition-transform ${item.color}`}><item.icon className="w-6 h-6" /></div>
+   643→   643→              <p className="text-sm font-medium text-gray-900">{item.label}</p>
+   644→   644→              <p className="text-xs text-gray-400 mt-0.5">{item.labelNep}</p>
+   645→   645→            </CardContent>
+   646→   646→          </Card>
+   647→   647→        ))}
+   648→   648→      </div>
+   649→   649→    </div>
+   650→   650→  )
+   651→   651→}
+   652→   652→
+   653→   653→// ============================================================
+   654→   654→// MEMBERS MODULE (with CRUD)
+   655→   655→// ============================================================
+   656→   656→function MembersModule({ data, onRefresh }: { data: DashboardData; onRefresh: () => void }) {
+   657→   657→  const [filter, setFilter] = useState('ALL')
+   658→   658→  const [addOpen, setAddOpen] = useState(false)
+   659→   659→  const [saving, setSaving] = useState(false)
+   660→   660→  const [form, setForm] = useState<Record<string, string>>({})
+   661→   661→
+   662→   662→  const filtered = data.members.filter(m => filter === 'ALL' || m.status === filter)
+   663→   663→
+   664→   664→  const handleAdd = async () => {
+   665→   665→    setSaving(true)
+   666→   666→    try {
+   667→   667→      const res = await fetch('/api/members', {
+   668→   668→        method: 'POST',
+   669→   669→        headers: { 'Content-Type': 'application/json' },
+   670→   670→        body: JSON.stringify(form),
+   671→   671→      })
+   672→   672→      if (res.ok) {
+   673→   673→        toast.success('Member registered successfully! / सदस्य दर्ता भयो!')
+   674→   674→        setAddOpen(false)
+   675→   675→        setForm({})
+   676→   676→        onRefresh()
+   677→   677→      } else {
+   678→   678→        toast.error('Failed to register member')
+   679→   679→      }
+   680→   680→    } catch { toast.error('Network error') }
+   681→   681→    setSaving(false)
+   682→   682→  }
+   683→   683→
+   684→   684→  return (
+   685→   685→    <div className="space-y-6">
+   686→   686→      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+   687→   687→        <div>
+   688→   688→          <h2 className="text-2xl font-bold text-gray-900">Member Management</h2>
+   689→   689→          <p className="text-gray-500 text-sm">सदस्य व्यवस्थापन - {data.members.length} total members</p>
+   690→   690→        </div>
+   691→   691→        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+   692→   692→          <DialogTrigger asChild>
+   693→   693→            <Button className="bg-emerald-600 hover:bg-emerald-700"><Plus className="w-4 h-4 mr-2" /> Add Member</Button>
+   694→   694→          </DialogTrigger>
+   695→   695→          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+   696→   696→            <DialogHeader>
+   697→   697→              <DialogTitle>Add New Member / नयाँ सदस्य दर्ता</DialogTitle>
+   698→   698→              <DialogDescription>Register a new cooperative member</DialogDescription>
+   699→   699→            </DialogHeader>
+   700→   700→            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
+   701→   701→              <div className="space-y-2"><Label>First Name *</Label><Input placeholder="First name" value={form.firstName || ''} onChange={e => setForm({...form, firstName: e.target.value})} /></div>
+   702→   702→              <div className="space-y-2"><Label>Last Name *</Label><Input placeholder="Last name" value={form.lastName || ''} onChange={e => setForm({...form, lastName: e.target.value})} /></div>
+   703→   703→              <div className="space-y-2"><Label>First Name (नेपाली)</Label><Input placeholder="पहिलो नाम" value={form.firstNameNep || ''} onChange={e => setForm({...form, firstNameNep: e.target.value})} /></div>
+   704→   704→              <div className="space-y-2"><Label>Last Name (नेपाली)</Label><Input placeholder="थर" value={form.lastNameNep || ''} onChange={e => setForm({...form, lastNameNep: e.target.value})} /></div>
+   705→   705→              <div className="space-y-2"><Label>Father&apos;s Name</Label><Input placeholder="बुबाको नाम" value={form.fatherName || ''} onChange={e => setForm({...form, fatherName: e.target.value})} /></div>
+   706→   706→              <div className="space-y-2"><Label>Gender</Label>
+   707→   707→                <Select value={form.gender || ''} onValueChange={v => setForm({...form, gender: v})}>
+   708→   708→                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+   709→   709→                  <SelectContent><SelectItem value="MALE">Male</SelectItem><SelectItem value="FEMALE">Female</SelectItem><SelectItem value="OTHER">Other</SelectItem></SelectContent>
+   710→   710→                </Select>
+   711→   711→              </div>
+   712→   712→              <div className="space-y-2"><Label>Phone *</Label><Input placeholder="98XXXXXXXX" value={form.phone || ''} onChange={e => setForm({...form, phone: e.target.value})} /></div>
+   713→   713→              <div className="space-y-2"><Label>Citizenship No.</Label><Input placeholder="नागरिकता नम्बर" value={form.citizenshipNo || ''} onChange={e => setForm({...form, citizenshipNo: e.target.value})} /></div>
+   714→   714→              <div className="space-y-2"><Label>Occupation</Label><Input placeholder="पेशा" value={form.occupation || ''} onChange={e => setForm({...form, occupation: e.target.value})} /></div>
+   715→   715→              <div className="space-y-2"><Label>Province</Label>
+   716→   716→                <Select value={form.province || ''} onValueChange={v => setForm({...form, province: v})}>
+   717→   717→                  <SelectTrigger><SelectValue placeholder="प्रदेश" /></SelectTrigger>
+   718→   718→                  <SelectContent>{['Koshi', 'Madhesh', 'Bagmati', 'Gandaki', 'Lumbini', 'Karnali', 'Sudurpashchim'].map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+   719→   719→                </Select>
+   720→   720→              </div>
+   721→   721→              <div className="space-y-2"><Label>District</Label><Input placeholder="जिल्ला" value={form.district || ''} onChange={e => setForm({...form, district: e.target.value})} /></div>
+   722→   722→              <div className="space-y-2"><Label>Municipality</Label><Input placeholder="नगरपालिका" value={form.municipality || ''} onChange={e => setForm({...form, municipality: e.target.value})} /></div>
+   723→   723→              <div className="space-y-2"><Label>Ward No.</Label><Input placeholder="वडा नम्बर" value={form.wardNo || ''} onChange={e => setForm({...form, wardNo: e.target.value})} /></div>
+   724→   724→              <div className="space-y-2"><Label>Member Type</Label>
+   725→   725→                <Select value={form.memberType || 'REGULAR'} onValueChange={v => setForm({...form, memberType: v})}>
+   726→   726→                  <SelectTrigger><SelectValue /></SelectTrigger>
+   727→   727→                  <SelectContent><SelectItem value="REGULAR">Regular</SelectItem><SelectItem value="ASSOCIATE">Associate</SelectItem><SelectItem value="HONORARY">Honorary</SelectItem></SelectContent>
+   728→   728→                </Select>
+   729→   729→              </div>
+   730→   730→              <div className="sm:col-span-2"><BSDatePicker label="Membership Date (BS)" value={form.membershipDate || getTodayBS()} onChange={v => setForm({...form, membershipDate: v})} /></div>
+   731→   731→            </div>
+   732→   732→            <DialogFooter>
+   733→   733→              <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+   734→   734→              <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleAdd} disabled={saving || !form.firstName || !form.lastName}>
+   735→   735→                {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Register Member
+   736→   736→              </Button>
+   737→   737→            </DialogFooter>
+   738→   738→          </DialogContent>
+   739→   739→        </Dialog>
+   740→   740→      </div>
+   741→   741→
+   742→   742→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+   743→   743→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-blue-600">{data.members.length}</p><p className="text-xs text-gray-500">Total / कुल</p></CardContent></Card>
+   744→   744→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-emerald-600">{data.members.filter(m=>m.status==='ACTIVE').length}</p><p className="text-xs text-gray-500">Active</p></CardContent></Card>
+   745→   745→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-amber-600">{data.members.filter(m=>m.gender==='FEMALE').length}</p><p className="text-xs text-gray-500">Female / महिला</p></CardContent></Card>
+   746→   746→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-purple-600">{data.members.filter(m=>m.gender==='MALE').length}</p><p className="text-xs text-gray-500">Male / पुरुष</p></CardContent></Card>
+   747→   747→      </div>
+   748→   748→
+   749→   749→      <div className="flex items-center gap-2 flex-wrap">
+   750→   750→        {['ALL', 'ACTIVE', 'INACTIVE', 'SUSPENDED'].map(s => (
+   751→   751→          <Button key={s} variant={filter === s ? 'default' : 'outline'} size="sm" onClick={() => setFilter(s)} className={filter === s ? 'bg-emerald-600 hover:bg-emerald-700' : ''}>{s}</Button>
+   752→   752→        ))}
+   753→   753→      </div>
+   754→   754→
+   755→   755→      <Card className="border-0 shadow-sm">
+   756→   756→        <CardContent className="p-0">
+   757→   757→          <div className="overflow-x-auto">
+   758→   758→            <Table>
+   759→   759→              <TableHeader><TableRow className="bg-gray-50">
+   760→   760→                <TableHead className="font-semibold">Member No.</TableHead>
+   761→   761→                <TableHead className="font-semibold">Name</TableHead>
+   762→   762→                <TableHead className="font-semibold hidden sm:table-cell">नेपाली</TableHead>
+   763→   763→                <TableHead className="font-semibold hidden md:table-cell">Phone</TableHead>
+   764→   764→                <TableHead className="font-semibold hidden md:table-cell">Occupation</TableHead>
+   765→   765→                <TableHead className="font-semibold">Status</TableHead>
+   766→   766→                <TableHead className="font-semibold">Actions</TableHead>
+   767→   767→              </TableRow></TableHeader>
+   768→   768→              <TableBody>
+   769→   769→                {filtered.map(m => (
+   770→   770→                  <TableRow key={m.id} className="hover:bg-gray-50">
+   771→   771→                    <TableCell className="font-medium text-emerald-600">{m.memberNo}</TableCell>
+   772→   772→                    <TableCell>{m.firstName} {m.lastName}</TableCell>
+   773→   773→                    <TableCell className="hidden sm:table-cell">{m.firstNameNep} {m.lastNameNep}</TableCell>
+   774→   774→                    <TableCell className="hidden md:table-cell">{m.phone}</TableCell>
+   775→   775→                    <TableCell className="hidden md:table-cell">{m.occupation}</TableCell>
+   776→   776→                    <TableCell><Badge className={statusColor(m.status)}>{m.status}</Badge></TableCell>
+   777→   777→                    <TableCell><Button variant="ghost" size="sm"><Eye className="w-4 h-4" /></Button></TableCell>
+   778→   778→                  </TableRow>
+   779→   779→                ))}
+   780→   780→              </TableBody>
+   781→   781→            </Table>
+   782→   782→          </div>
+   783→   783→        </CardContent>
+   784→   784→      </Card>
+   785→   785→    </div>
+   786→   786→  )
+   787→   787→}
+   788→   788→
+   789→   789→// ============================================================
+   790→   790→// SAVINGS MODULE (with deposit/withdraw)
+   791→   791→// ============================================================
+   792→   792→function SavingsModule({ data, onRefresh }: { data: DashboardData; onRefresh: () => void }) {
+   793→   793→  const [actionOpen, setActionOpen] = useState(false)
+   794→   794→  const [actionType, setActionType] = useState<'deposit' | 'withdraw'>('deposit')
+   795→   795→  const [selectedAccount, setSelectedAccount] = useState('')
+   796→   796→  const [amount, setAmount] = useState('')
+   797→   797→  const [saving, setSaving] = useState(false)
+   798→   798→
+   799→   799→  const totalBalance = data.savingsAccounts.reduce((s, a) => s + a.balance, 0)
+   800→   800→
+   801→   801→  const handleAction = async () => {
+   802→   802→    setSaving(true)
+   803→   803→    try {
+   804→   804→      const res = await fetch('/api/savings', {
+   805→   805→        method: 'POST',
+   806→   806→        headers: { 'Content-Type': 'application/json' },
+   807→   807→        body: JSON.stringify({ action: actionType, accountNo: selectedAccount, amount: parseFloat(amount) }),
+   808→   808→      })
+   809→   809→      if (res.ok) {
+   810→   810→        toast.success(`${actionType === 'deposit' ? 'Deposit' : 'Withdrawal'} successful! / ${actionType === 'deposit' ? 'निक्षेप' : 'निकासा'} सफल!`)
+   811→   811→        setActionOpen(false)
+   812→   812→        setAmount('')
+   813→   813→        onRefresh()
+   814→   814→      } else { toast.error('Transaction failed') }
+   815→   815→    } catch { toast.error('Network error') }
+   816→   816→    setSaving(false)
+   817→   817→  }
+   818→   818→
+   819→   819→  return (
+   820→   820→    <div className="space-y-6">
+   821→   821→      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+   822→   822→        <div><h2 className="text-2xl font-bold text-gray-900">Savings & Deposits</h2><p className="text-gray-500 text-sm">बचत तथा निक्षेप व्यवस्थापन</p></div>
+   823→   823→        <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => { setActionType('deposit'); setSelectedAccount(''); setActionOpen(true) }}><Plus className="w-4 h-4 mr-2" /> New Account</Button>
+   824→   824→      </div>
+   825→   825→
+   826→   826→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+   827→   827→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-amber-600">{data.savingsAccounts.length}</p><p className="text-xs text-gray-500">Accounts</p></CardContent></Card>
+   828→   828→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-emerald-600">{formatNPR(totalBalance)}</p><p className="text-xs text-gray-500">Total Balance</p></CardContent></Card>
+   829→   829→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-blue-600">{formatNPR(data.savingsAccounts.reduce((s,a)=>s+a.interestEarned,0))}</p><p className="text-xs text-gray-500">Interest</p></CardContent></Card>
+   830→   830→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-purple-600">{data.savingsAccounts.filter(a=>a.status==='ACTIVE').length}</p><p className="text-xs text-gray-500">Active</p></CardContent></Card>
+   831→   831→      </div>
+   832→   832→
+   833→   833→      <Card className="border-0 shadow-sm">
+   834→   834→        <CardContent className="p-0">
+   835→   835→          <div className="overflow-x-auto">
+   836→   836→            <Table>
+   837→   837→              <TableHeader><TableRow className="bg-gray-50">
+   838→   838→                <TableHead className="font-semibold">Account No.</TableHead>
+   839→   839→                <TableHead className="font-semibold">Member</TableHead>
+   840→   840→                <TableHead className="font-semibold hidden sm:table-cell">Product</TableHead>
+   841→   841→                <TableHead className="font-semibold">Balance</TableHead>
+   842→   842→                <TableHead className="font-semibold hidden md:table-cell">Interest</TableHead>
+   843→   843→                <TableHead className="font-semibold">Status</TableHead>
+   844→   844→                <TableHead className="font-semibold">Actions</TableHead>
+   845→   845→              </TableRow></TableHeader>
+   846→   846→              <TableBody>
+   847→   847→                {data.savingsAccounts.map(sa => (
+   848→   848→                  <TableRow key={sa.id} className="hover:bg-gray-50">
+   849→   849→                    <TableCell className="font-medium text-amber-600">{sa.accountNo}</TableCell>
+   850→   850→                    <TableCell>{sa.member ? `${sa.member.firstName} ${sa.member.lastName}` : '—'}</TableCell>
+   851→   851→                    <TableCell className="hidden sm:table-cell">{sa.product?.name || '—'}</TableCell>
+   852→   852→                    <TableCell className="font-medium">{formatNPR(sa.balance)}</TableCell>
+   853→   853→                    <TableCell className="hidden md:table-cell">{formatNPR(sa.interestEarned)}</TableCell>
+   854→   854→                    <TableCell><Badge className={statusColor(sa.status)}>{sa.status}</Badge></TableCell>
+   855→   855→                    <TableCell>
+   856→   856→                      <div className="flex gap-1">
+   857→   857→                        <Button variant="ghost" size="sm" title="Deposit" onClick={() => { setActionType('deposit'); setSelectedAccount(sa.accountNo); setActionOpen(true) }}><ArrowUpRight className="w-4 h-4 text-emerald-600" /></Button>
+   858→   858→                        <Button variant="ghost" size="sm" title="Withdraw" onClick={() => { setActionType('withdraw'); setSelectedAccount(sa.accountNo); setActionOpen(true) }}><ArrowDownRight className="w-4 h-4 text-rose-600" /></Button>
+   859→   859→                      </div>
+   860→   860→                    </TableCell>
+   861→   861→                  </TableRow>
+   862→   862→                ))}
+   863→   863→              </TableBody>
+   864→   864→            </Table>
+   865→   865→          </div>
+   866→   866→        </CardContent>
+   867→   867→      </Card>
+   868→   868→
+   869→   869→      <Dialog open={actionOpen} onOpenChange={setActionOpen}>
+   870→   870→        <DialogContent className="max-w-md">
+   871→   871→          <DialogHeader>
+   872→   872→            <DialogTitle>{actionType === 'deposit' ? 'Cash Deposit / नगद निक्षेप' : 'Cash Withdrawal / नगद निकासा'}</DialogTitle>
+   873→   873→            <DialogDescription>Account: {selectedAccount}</DialogDescription>
+   874→   874→          </DialogHeader>
+   875→   875→          <div className="space-y-4 py-4">
+   876→   876→            <div className="space-y-2"><Label>Amount (NPR)</Label><Input type="number" placeholder="Enter amount" value={amount} onChange={e => setAmount(e.target.value)} /></div>
+   877→   877→            {amount && <div className="p-3 bg-gray-50 rounded-lg text-sm"><p className="text-gray-500">In words: {nprToWords(parseFloat(amount))} Rupees Only</p></div>}
+   878→   878→          </div>
+   879→   879→          <DialogFooter>
+   880→   880→            <Button variant="outline" onClick={() => setActionOpen(false)}>Cancel</Button>
+   881→   881→            <Button className={actionType === 'deposit' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'} onClick={handleAction} disabled={saving || !amount}>
+   882→   882→              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+   883→   883→              {actionType === 'deposit' ? 'Deposit' : 'Withdraw'}
+   884→   884→            </Button>
+   885→   885→          </DialogFooter>
+   886→   886→        </DialogContent>
+   887→   887→      </Dialog>
+   888→   888→    </div>
+   889→   889→  )
+   890→   890→}
+   891→   891→
+   892→   892→// ============================================================
+   893→   893→// LOANS MODULE (with approve/disburse)
+   894→   894→// ============================================================
+   895→   895→function LoansModule({ data, onRefresh }: { data: DashboardData; onRefresh: () => void }) {
+   896→   896→  const [tab, setTab] = useState('all')
+   897→   897→  const [actionOpen, setActionOpen] = useState(false)
+   898→   898→  const [actionType, setActionType] = useState<'approve' | 'disburse' | 'reject'>('approve')
+   899→   899→  const [selectedLoan, setSelectedLoan] = useState('')
+   900→   900→  const [actionForm, setActionForm] = useState<Record<string, string>>({})
+   901→   901→
+   902→   902→  const filtered = data.loanApps.filter(l => {
+   903→   903→    if (tab === 'all') return true
+   904→   904→    if (tab === 'pending') return l.status === 'PENDING' || l.status === 'UNDER_REVIEW'
+   905→   905→    if (tab === 'disbursed') return l.status === 'DISBURSED'
+   906→   906→    if (tab === 'approved') return l.status === 'APPROVED'
+   907→   907→    return true
+   908→   908→  })
+   909→   909→
+   910→   910→  const handleAction = async () => {
+   911→   911→    try {
+   912→   912→      const body: any = { action: actionType, applicationNo: selectedLoan }
+   913→   913→      if (actionType === 'approve') {
+   914→   914→        body.approvedAmount = actionForm.approvedAmount
+   915→   915→        body.interestRate = actionForm.interestRate
+   916→   916→      } else if (actionType === 'disburse') {
+   917→   917→        body.disbursedAmount = actionForm.disbursedAmount
+   918→   918→        body.emiAmount = actionForm.emiAmount
+   919→   919→      } else if (actionType === 'reject') {
+   920→   920→        body.rejectionReason = actionForm.rejectionReason
+   921→   921→      }
+   922→   922→      const res = await fetch('/api/loans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+   923→   923→      if (res.ok) {
+   924→   924→        toast.success(`Loan ${actionType}d successfully!`)
+   925→   925→        setActionOpen(false)
+   926→   926→        setActionForm({})
+   927→   927→        onRefresh()
+   928→   928→      } else { toast.error('Action failed') }
+   929→   929→    } catch { toast.error('Network error') }
+   930→   930→  }
+   931→   931→
+   932→   932→  return (
+   933→   933→    <div className="space-y-6">
+   934→   934→      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+   935→   935→        <div><h2 className="text-2xl font-bold text-gray-900">Loan Management</h2><p className="text-gray-500 text-sm">ऋण व्यवस्थापन</p></div>
+   936→   936→        <Button className="bg-emerald-600 hover:bg-emerald-700"><Plus className="w-4 h-4 mr-2" /> New Application</Button>
+   937→   937→      </div>
+   938→   938→
+   939→   939→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+   940→   940→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-rose-600">{data.loanApps.length}</p><p className="text-xs text-gray-500">Applications</p></CardContent></Card>
+   941→   941→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-emerald-600">{formatNPR(data.loanApps.filter(l=>l.status==='DISBURSED').reduce((s,l)=>s+(l.disbursedAmount||0),0))}</p><p className="text-xs text-gray-500">Disbursed</p></CardContent></Card>
+   942→   942→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-amber-600">{formatNPR(data.loanApps.filter(l=>l.status==='DISBURSED').reduce((s,l)=>s+(l.outstandingAmount||0),0))}</p><p className="text-xs text-gray-500">Outstanding</p></CardContent></Card>
+   943→   943→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-blue-600">{data.loanApps.filter(l=>l.status==='PENDING'||l.status==='UNDER_REVIEW').length}</p><p className="text-xs text-gray-500">Pending</p></CardContent></Card>
+   944→   944→      </div>
+   945→   945→
+   946→   946→      <Tabs value={tab} onValueChange={setTab}>
+   947→   947→        <TabsList><TabsTrigger value="all">All</TabsTrigger><TabsTrigger value="pending">Pending</TabsTrigger><TabsTrigger value="approved">Approved</TabsTrigger><TabsTrigger value="disbursed">Disbursed</TabsTrigger></TabsList>
+   948→   948→      </Tabs>
+   949→   949→
+   950→   950→      <Card className="border-0 shadow-sm">
+   951→   951→        <CardContent className="p-0">
+   952→   952→          <div className="overflow-x-auto">
+   953→   953→            <Table>
+   954→   954→              <TableHeader><TableRow className="bg-gray-50">
+   955→   955→                <TableHead className="font-semibold">App No.</TableHead>
+   956→   956→                <TableHead className="font-semibold">Member</TableHead>
+   957→   957→                <TableHead className="font-semibold hidden sm:table-cell">Product</TableHead>
+   958→   958→                <TableHead className="font-semibold">Amount</TableHead>
+   959→   959→                <TableHead className="font-semibold hidden md:table-cell">Term</TableHead>
+   960→   960→                <TableHead className="font-semibold hidden md:table-cell">Rate</TableHead>
+   961→   961→                <TableHead className="font-semibold">Status</TableHead>
+   962→   962→                <TableHead className="font-semibold">Actions</TableHead>
+   963→   963→              </TableRow></TableHeader>
+   964→   964→              <TableBody>
+   965→   965→                {filtered.map(la => (
+   966→   966→                  <TableRow key={la.id} className="hover:bg-gray-50">
+   967→   967→                    <TableCell className="font-medium text-rose-600">{la.applicationNo}</TableCell>
+   968→   968→                    <TableCell>{la.member ? `${la.member.firstName} ${la.member.lastName}` : '—'}</TableCell>
+   969→   969→                    <TableCell className="hidden sm:table-cell">{la.product?.name || '—'}</TableCell>
+   970→   970→                    <TableCell className="font-medium">{formatNPR(la.requestedAmount)}</TableCell>
+   971→   971→                    <TableCell className="hidden md:table-cell">{la.term} mo</TableCell>
+   972→   972→                    <TableCell className="hidden md:table-cell">{la.interestRate ? `${la.interestRate}%` : '—'}</TableCell>
+   973→   973→                    <TableCell><Badge className={statusColor(la.status)}>{la.status}</Badge></TableCell>
+   974→   974→                    <TableCell>
+   975→   975→                      <div className="flex gap-1">
+   976→   976→                        {(la.status === 'PENDING' || la.status === 'UNDER_REVIEW') && (
+   977→   977→                          <>
+   978→   978→                            <Button variant="ghost" size="sm" className="text-emerald-600" onClick={() => { setActionType('approve'); setSelectedLoan(la.applicationNo); setActionForm({approvedAmount: String(la.requestedAmount), interestRate: String(la.product?.interestRate || '')}); setActionOpen(true) }}><CheckCircle2 className="w-4 h-4" /></Button>
+   979→   979→                            <Button variant="ghost" size="sm" className="text-red-600" onClick={() => { setActionType('reject'); setSelectedLoan(la.applicationNo); setActionForm({}); setActionOpen(true) }}><X className="w-4 h-4" /></Button>
+   980→   980→                          </>
+   981→   981→                        )}
+   982→   982→                        {la.status === 'APPROVED' && (
+   983→   983→                          <Button variant="ghost" size="sm" className="text-blue-600" onClick={() => { setActionType('disburse'); setSelectedLoan(la.applicationNo); setActionForm({disbursedAmount: String(la.approvedAmount || la.requestedAmount)}); setActionOpen(true) }}><DollarSign className="w-4 h-4" /></Button>
+   984→   984→                        )}
+   985→   985→                        <Button variant="ghost" size="sm"><Eye className="w-4 h-4" /></Button>
+   986→   986→                      </div>
+   987→   987→                    </TableCell>
+   988→   988→                  </TableRow>
+   989→   989→                ))}
+   990→   990→              </TableBody>
+   991→   991→            </Table>
+   992→   992→          </div>
+   993→   993→        </CardContent>
+   994→   994→      </Card>
+   995→   995→
+   996→   996→      <Dialog open={actionOpen} onOpenChange={setActionOpen}>
+   997→   997→        <DialogContent className="max-w-md">
+   998→   998→          <DialogHeader>
+   999→   999→            <DialogTitle>{actionType === 'approve' ? 'Approve Loan / ऋण स्वीकृत' : actionType === 'disburse' ? 'Disburse Loan / ऋण वितरण' : 'Reject Loan / ऋण अस्वीकृत'}</DialogTitle>
+  1000→  1000→            <DialogDescription>Application: {selectedLoan}</DialogDescription>
+  1001→  1001→          </DialogHeader>
+  1002→  1002→          <div className="space-y-4 py-4">
+  1003→  1003→            {actionType === 'approve' && (
+  1004→  1004→              <>
+  1005→  1005→                <div className="space-y-2"><Label>Approved Amount (NPR)</Label><Input type="number" value={actionForm.approvedAmount || ''} onChange={e => setActionForm({...actionForm, approvedAmount: e.target.value})} /></div>
+  1006→  1006→                <div className="space-y-2"><Label>Interest Rate (%)</Label><Input type="number" step="0.5" value={actionForm.interestRate || ''} onChange={e => setActionForm({...actionForm, interestRate: e.target.value})} /></div>
+  1007→  1007→              </>
+  1008→  1008→            )}
+  1009→  1009→            {actionType === 'disburse' && (
+  1010→  1010→              <>
+  1011→  1011→                <div className="space-y-2"><Label>Disbursement Amount (NPR)</Label><Input type="number" value={actionForm.disbursedAmount || ''} onChange={e => setActionForm({...actionForm, disbursedAmount: e.target.value})} /></div>
+  1012→  1012→                <div className="space-y-2"><Label>EMI Amount (NPR)</Label><Input type="number" value={actionForm.emiAmount || ''} onChange={e => setActionForm({...actionForm, emiAmount: e.target.value})} /></div>
+  1013→  1013→              </>
+  1014→  1014→            )}
+  1015→  1015→            {actionType === 'reject' && (
+  1016→  1016→              <div className="space-y-2"><Label>Rejection Reason</Label><Textarea placeholder="अस्वीकृति कारण..." value={actionForm.rejectionReason || ''} onChange={e => setActionForm({...actionForm, rejectionReason: e.target.value})} /></div>
+  1017→  1017→            )}
+  1018→  1018→          </div>
+  1019→  1019→          <DialogFooter>
+  1020→  1020→            <Button variant="outline" onClick={() => setActionOpen(false)}>Cancel</Button>
+  1021→  1021→            <Button className={actionType === 'reject' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'} onClick={handleAction}>
+  1022→  1022→              {actionType === 'approve' ? 'Approve' : actionType === 'disburse' ? 'Disburse' : 'Reject'}
+  1023→  1023→            </Button>
+  1024→  1024→          </DialogFooter>
+  1025→  1025→        </DialogContent>
+  1026→  1026→      </Dialog>
+  1027→  1027→    </div>
+  1028→  1028→  )
+  1029→  1029→}
+  1030→  1030→
+  1031→  1031→// ============================================================
+  1032→  1032→// ACCOUNTING MODULE
+  1033→  1033→// ============================================================
+  1034→  1034→function AccountingModule({ data, onRefresh }: { data: DashboardData; onRefresh: () => void }) {
+  1035→  1035→  const [tab, setTab] = useState('journal')
+  1036→  1036→  return (
+  1037→  1037→    <div className="space-y-6">
+  1038→  1038→      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+  1039→  1039→        <div><h2 className="text-2xl font-bold text-gray-900">Accounting</h2><p className="text-gray-500 text-sm">लेखा व्यवस्थापन - Double Entry System</p></div>
+  1040→  1040→        <Button className="bg-emerald-600 hover:bg-emerald-700"><Plus className="w-4 h-4 mr-2" /> New Entry</Button>
+  1041→  1041→      </div>
+  1042→  1042→      <Tabs value={tab} onValueChange={setTab}>
+  1043→  1043→        <TabsList><TabsTrigger value="journal">Journal Entries</TabsTrigger><TabsTrigger value="chart">Chart of Accounts</TabsTrigger><TabsTrigger value="ledger">Ledger</TabsTrigger></TabsList>
+  1044→  1044→        <TabsContent value="journal" className="mt-4">
+  1045→  1045→          <Card className="border-0 shadow-sm"><CardContent className="p-0"><div className="overflow-x-auto">
+  1046→  1046→            <Table><TableHeader><TableRow className="bg-gray-50">
+  1047→  1047→              <TableHead className="font-semibold">Voucher</TableHead><TableHead className="font-semibold">Date</TableHead>
+  1048→  1048→              <TableHead className="font-semibold">Narration</TableHead><TableHead className="font-semibold">Type</TableHead>
+  1049→  1049→              <TableHead className="font-semibold">Debit</TableHead><TableHead className="font-semibold">Credit</TableHead><TableHead className="font-semibold">Status</TableHead>
+  1050→  1050→            </TableRow></TableHeader><TableBody>
+  1051→  1051→              {data.journalEntries.map(je => (
+  1052→  1052→                <TableRow key={je.id} className="hover:bg-gray-50">
+  1053→  1053→                  <TableCell className="font-medium text-purple-600">{je.voucherNo}</TableCell>
+  1054→  1054→                  <TableCell>{je.date}</TableCell>
+  1055→  1055→                  <TableCell className="max-w-xs truncate">{je.narration}</TableCell>
+  1056→  1056→                  <TableCell><Badge variant="outline">{je.entryType}</Badge></TableCell>
+  1057→  1057→                  <TableCell className="text-emerald-600">{formatNPR(je.items.reduce((s:any,i:any)=>s+i.debit,0))}</TableCell>
+  1058→  1058→                  <TableCell className="text-rose-600">{formatNPR(je.items.reduce((s:any,i:any)=>s+i.credit,0))}</TableCell>
+  1059→  1059→                  <TableCell><Badge className={statusColor(je.status)}>{je.status}</Badge></TableCell>
+  1060→  1060→                </TableRow>
+  1061→  1061→              ))}
+  1062→  1062→            </TableBody></Table>
+  1063→  1063→          </div></CardContent></Card>
+  1064→  1064→        </TabsContent>
+  1065→  1065→        <TabsContent value="chart" className="mt-4">
+  1066→  1066→          <Card className="border-0 shadow-sm"><CardContent className="p-0"><div className="overflow-x-auto">
+  1067→  1067→            <Table><TableHeader><TableRow className="bg-gray-50">
+  1068→  1068→              <TableHead className="font-semibold">Code</TableHead><TableHead className="font-semibold">Account Name</TableHead>
+  1069→  1069→              <TableHead className="font-semibold hidden sm:table-cell">नेपाली</TableHead><TableHead className="font-semibold">Type</TableHead>
+  1070→  1070→            </TableRow></TableHeader><TableBody>
+  1071→  1071→              {data.accounts.map(acct => (
+  1072→  1072→                <TableRow key={acct.id} className="hover:bg-gray-50">
+  1073→  1073→                  <TableCell className="font-mono text-sm">{acct.code}</TableCell>
+  1074→  1074→                  <TableCell className={acct.subType === 'HEADER' ? 'font-semibold' : ''}>{acct.name}</TableCell>
+  1075→  1075→                  <TableCell className="hidden sm:table-cell">{acct.nameNepali}</TableCell>
+  1076→  1076→                  <TableCell><Badge variant="outline" className={acct.type === 'ASSET' ? 'border-emerald-300 text-emerald-700' : acct.type === 'LIABILITY' ? 'border-rose-300 text-rose-700' : acct.type === 'INCOME' ? 'border-blue-300 text-blue-700' : acct.type === 'EXPENSE' ? 'border-amber-300 text-amber-700' : 'border-purple-300 text-purple-700'}>{acct.type}</Badge></TableCell>
+  1077→  1077→                </TableRow>
+  1078→  1078→              ))}
+  1079→  1079→            </TableBody></Table>
+  1080→  1080→          </div></CardContent></Card>
+  1081→  1081→        </TabsContent>
+  1082→  1082→        <TabsContent value="ledger" className="mt-4">
+  1083→  1083→          <Card className="border-0 shadow-sm"><CardHeader><CardTitle className="text-base">General Ledger</CardTitle><CardDescription>Select an account to view ledger entries</CardDescription></CardHeader>
+  1084→  1084→          <CardContent><div className="text-center py-12 text-gray-400"><BookOpen className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>Select an account to view ledger entries</p></div></CardContent></Card>
+  1085→  1085→        </TabsContent>
+  1086→  1086→      </Tabs>
+  1087→  1087→    </div>
+  1088→  1088→  )
+  1089→  1089→}
+  1090→  1090→
+  1091→  1091→// ============================================================
+  1092→  1092→// HR MODULE
+  1093→  1093→// ============================================================
+  1094→  1094→function HRModule({ data, onRefresh }: { data: DashboardData; onRefresh: () => void }) {
+  1095→  1095→  const [tab, setTab] = useState('employees')
+  1096→  1096→  const [addOpen, setAddOpen] = useState(false)
+  1097→  1097→  const [saving, setSaving] = useState(false)
+  1098→  1098→  const [form, setForm] = useState<Record<string, string>>({})
+  1099→  1099→  const totalSalary = data.employees.reduce((s, e) => s + e.salary, 0)
+  1100→  1100→
+  1101→  1101→  const handleAdd = async () => {
+  1102→  1102→    setSaving(true)
+  1103→  1103→    try {
+  1104→  1104→      const res = await fetch('/api/hr', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+  1105→  1105→      if (res.ok) { toast.success('Employee added! / कर्मचारी थपियो!'); setAddOpen(false); setForm({}); onRefresh() }
+  1106→  1106→      else toast.error('Failed to add employee')
+  1107→  1107→    } catch { toast.error('Network error') }
+  1108→  1108→    setSaving(false)
+  1109→  1109→  }
+  1110→  1110→
+  1111→  1111→  return (
+  1112→  1112→    <div className="space-y-6">
+  1113→  1113→      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+  1114→  1114→        <div><h2 className="text-2xl font-bold text-gray-900">HR & Payroll</h2><p className="text-gray-500 text-sm">मानव संसाधन तथा तलब व्यवस्थापन</p></div>
+  1115→  1115→        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+  1116→  1116→          <DialogTrigger asChild><Button className="bg-emerald-600 hover:bg-emerald-700"><Plus className="w-4 h-4 mr-2" /> Add Employee</Button></DialogTrigger>
+  1117→  1117→          <DialogContent className="max-w-lg">
+  1118→  1118→            <DialogHeader><DialogTitle>Add Employee / कर्मचारी थप्नुहोस्</DialogTitle></DialogHeader>
+  1119→  1119→            <div className="grid grid-cols-2 gap-4 py-4">
+  1120→  1120→              <div className="space-y-2"><Label>First Name *</Label><Input value={form.firstName||''} onChange={e=>setForm({...form,firstName:e.target.value})} /></div>
+  1121→  1121→              <div className="space-y-2"><Label>Last Name *</Label><Input value={form.lastName||''} onChange={e=>setForm({...form,lastName:e.target.value})} /></div>
+  1122→  1122→              <div className="space-y-2"><Label>Position</Label><Input value={form.position||''} onChange={e=>setForm({...form,position:e.target.value})} /></div>
+  1123→  1123→              <div className="space-y-2"><Label>Department</Label><Input value={form.department||''} onChange={e=>setForm({...form,department:e.target.value})} /></div>
+  1124→  1124→              <div className="space-y-2"><Label>Salary (NPR)</Label><Input type="number" value={form.salary||''} onChange={e=>setForm({...form,salary:e.target.value})} /></div>
+  1125→  1125→              <div className="space-y-2"><Label>Phone</Label><Input value={form.phone||''} onChange={e=>setForm({...form,phone:e.target.value})} /></div>
+  1126→  1126→              <div className="col-span-2"><BSDatePicker label="Join Date (BS)" value={form.joinDate||getTodayBS()} onChange={v=>setForm({...form,joinDate:v})} /></div>
+  1127→  1127→            </div>
+  1128→  1128→            <DialogFooter><Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleAdd} disabled={saving||!form.firstName}>{saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Add</Button></DialogFooter>
+  1129→  1129→          </DialogContent>
+  1130→  1130→        </Dialog>
+  1131→  1131→      </div>
+  1132→  1132→
+  1133→  1133→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+  1134→  1134→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-teal-600">{data.employees.length}</p><p className="text-xs text-gray-500">Employees</p></CardContent></Card>
+  1135→  1135→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-emerald-600">{data.employees.filter(e=>e.status==='ACTIVE').length}</p><p className="text-xs text-gray-500">Active</p></CardContent></Card>
+  1136→  1136→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-blue-600">{formatNPR(totalSalary)}</p><p className="text-xs text-gray-500">Monthly Salary</p></CardContent></Card>
+  1137→  1137→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-purple-600">{new Set(data.employees.map(e=>e.department)).size}</p><p className="text-xs text-gray-500">Departments</p></CardContent></Card>
+  1138→  1138→      </div>
+  1139→  1139→
+  1140→  1140→      <Card className="border-0 shadow-sm"><CardContent className="p-0"><div className="overflow-x-auto">
+  1141→  1141→        <Table><TableHeader><TableRow className="bg-gray-50">
+  1142→  1142→          <TableHead className="font-semibold">Emp ID</TableHead><TableHead className="font-semibold">Name</TableHead>
+  1143→  1143→          <TableHead className="font-semibold hidden sm:table-cell">Position</TableHead><TableHead className="font-semibold hidden md:table-cell">Department</TableHead>
+  1144→  1144→          <TableHead className="font-semibold">Salary</TableHead><TableHead className="font-semibold">Status</TableHead>
+  1145→  1145→        </TableRow></TableHeader><TableBody>
+  1146→  1146→          {data.employees.map(emp => (
+  1147→  1147→            <TableRow key={emp.id} className="hover:bg-gray-50">
+  1148→  1148→              <TableCell className="font-medium text-teal-600">{emp.employeeId}</TableCell>
+  1149→  1149→              <TableCell>{emp.firstName} {emp.lastName}</TableCell>
+  1150→  1150→              <TableCell className="hidden sm:table-cell">{emp.position}</TableCell>
+  1151→  1151→              <TableCell className="hidden md:table-cell">{emp.department}</TableCell>
+  1152→  1152→              <TableCell>{formatNPR(emp.salary)}</TableCell>
+  1153→  1153→              <TableCell><Badge className={statusColor(emp.status)}>{emp.status}</Badge></TableCell>
+  1154→  1154→            </TableRow>
+  1155→  1155→          ))}
+  1156→  1156→        </TableBody></Table>
+  1157→  1157→      </div></CardContent></Card>
+  1158→  1158→    </div>
+  1159→  1159→  )
+  1160→  1160→}
+  1161→  1161→
+  1162→  1162→// ============================================================
+  1163→  1163→// INVENTORY MODULE
+  1164→  1164→// ============================================================
+  1165→  1165→function InventoryModule({ data, onRefresh }: { data: DashboardData; onRefresh: () => void }) {
+  1166→  1166→  const totalValue = data.inventoryItems.reduce((s, i) => s + i.totalValue, 0)
+  1167→  1167→  return (
+  1168→  1168→    <div className="space-y-6">
+  1169→  1169→      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+  1170→  1170→        <div><h2 className="text-2xl font-bold text-gray-900">Inventory</h2><p className="text-gray-500 text-sm">सूची व्यवस्थापन</p></div>
+  1171→  1171→        <Button className="bg-emerald-600 hover:bg-emerald-700"><Plus className="w-4 h-4 mr-2" /> Add Item</Button>
+  1172→  1172→      </div>
+  1173→  1173→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+  1174→  1174→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-orange-600">{data.inventoryItems.length}</p><p className="text-xs text-gray-500">Items</p></CardContent></Card>
+  1175→  1175→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-emerald-600">{formatNPR(totalValue)}</p><p className="text-xs text-gray-500">Total Value</p></CardContent></Card>
+  1176→  1176→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-red-600">{data.inventoryItems.filter(i=>i.quantity<=i.minStockLevel).length}</p><p className="text-xs text-gray-500">Low Stock</p></CardContent></Card>
+  1177→  1177→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-blue-600">{new Set(data.inventoryItems.map(i=>i.category)).size}</p><p className="text-xs text-gray-500">Categories</p></CardContent></Card>
+  1178→  1178→      </div>
+  1179→  1179→      <Card className="border-0 shadow-sm"><CardContent className="p-0"><div className="overflow-x-auto">
+  1180→  1180→        <Table><TableHeader><TableRow className="bg-gray-50">
+  1181→  1181→          <TableHead className="font-semibold">Code</TableHead><TableHead className="font-semibold">Item</TableHead>
+  1182→  1182→          <TableHead className="font-semibold hidden sm:table-cell">Category</TableHead><TableHead className="font-semibold">Qty</TableHead>
+  1183→  1183→          <TableHead className="font-semibold hidden md:table-cell">Unit Price</TableHead><TableHead className="font-semibold">Value</TableHead>
+  1184→  1184→          <TableHead className="font-semibold">Stock</TableHead>
+  1185→  1185→        </TableRow></TableHeader><TableBody>
+  1186→  1186→          {data.inventoryItems.map(item => (
+  1187→  1187→            <TableRow key={item.id} className="hover:bg-gray-50">
+  1188→  1188→              <TableCell className="font-medium text-orange-600">{item.code}</TableCell>
+  1189→  1189→              <TableCell><div>{item.name}</div><div className="text-xs text-gray-400">{item.nameNepali}</div></TableCell>
+  1190→  1190→              <TableCell className="hidden sm:table-cell">{item.category}</TableCell>
+  1191→  1191→              <TableCell>{item.quantity} {item.unit}</TableCell>
+  1192→  1192→              <TableCell className="hidden md:table-cell">{formatNPR(item.unitPrice)}</TableCell>
+  1193→  1193→              <TableCell className="font-medium">{formatNPR(item.totalValue)}</TableCell>
+  1194→  1194→              <TableCell><div className="flex items-center gap-2"><Progress value={(item.quantity/(item.minStockLevel*3))*100} className="w-16 h-2" /><span className={`text-xs ${item.quantity<=item.minStockLevel?'text-red-600 font-medium':'text-gray-500'}`}>{item.quantity<=item.minStockLevel?'Low':'OK'}</span></div></TableCell>
+  1195→  1195→            </TableRow>
+  1196→  1196→          ))}
+  1197→  1197→        </TableBody></Table>
+  1198→  1198→      </div></CardContent></Card>
+  1199→  1199→    </div>
+  1200→  1200→  )
+  1201→  1201→}
+  1202→  1202→
+  1203→  1203→// ============================================================
+  1204→  1204→// ASSETS MODULE
+  1205→  1205→// ============================================================
+  1206→  1206→function AssetsModule({ data, onRefresh }: { data: DashboardData; onRefresh: () => void }) {
+  1207→  1207→  return (
+  1208→  1208→    <div className="space-y-6">
+  1209→  1209→      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+  1210→  1210→        <div><h2 className="text-2xl font-bold text-gray-900">Assets</h2><p className="text-gray-500 text-sm">सम्पत्ति व्यवस्थापन</p></div>
+  1211→  1211→        <Button className="bg-emerald-600 hover:bg-emerald-700"><Plus className="w-4 h-4 mr-2" /> Add Asset</Button>
+  1212→  1212→      </div>
+  1213→  1213→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+  1214→  1214→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-cyan-600">{data.assets.length}</p><p className="text-xs text-gray-500">Total Assets</p></CardContent></Card>
+  1215→  1215→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-emerald-600">{formatNPR(data.assets.reduce((s,a)=>s+a.currentValue,0))}</p><p className="text-xs text-gray-500">Current Value</p></CardContent></Card>
+  1216→  1216→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-amber-600">{formatNPR(data.assets.reduce((s,a)=>s+a.purchasePrice,0))}</p><p className="text-xs text-gray-500">Purchase Value</p></CardContent></Card>
+  1217→  1217→        <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-red-600">{formatNPR(data.assets.reduce((s,a)=>s+a.accumulatedDep,0))}</p><p className="text-xs text-gray-500">Depreciation</p></CardContent></Card>
+  1218→  1218→      </div>
+  1219→  1219→      <Card className="border-0 shadow-sm"><CardContent className="p-0"><div className="overflow-x-auto">
+  1220→  1220→        <Table><TableHeader><TableRow className="bg-gray-50">
+  1221→  1221→          <TableHead className="font-semibold">Code</TableHead><TableHead className="font-semibold">Name</TableHead>
+  1222→  1222→          <TableHead className="font-semibold hidden sm:table-cell">Category</TableHead><TableHead className="font-semibold hidden md:table-cell">Purchase</TableHead>
+  1223→  1223→          <TableHead className="font-semibold">Current</TableHead><TableHead className="font-semibold hidden md:table-cell">Dep. Rate</TableHead><TableHead className="font-semibold">Status</TableHead>
+  1224→  1224→        </TableRow></TableHeader><TableBody>
+  1225→  1225→          {data.assets.map(a => (
+  1226→  1226→            <TableRow key={a.id} className="hover:bg-gray-50">
+  1227→  1227→              <TableCell className="font-medium text-cyan-600">{a.code}</TableCell>
+  1228→  1228→              <TableCell><div>{a.name}</div><div className="text-xs text-gray-400">{a.nameNepali}</div></TableCell>
+  1229→  1229→              <TableCell className="hidden sm:table-cell"><Badge variant="outline">{a.category}</Badge></TableCell>
+  1230→  1230→              <TableCell className="hidden md:table-cell">{formatNPR(a.purchasePrice)}</TableCell>
+  1231→  1231→              <TableCell className="font-medium">{formatNPR(a.currentValue)}</TableCell>
+  1232→  1232→              <TableCell className="hidden md:table-cell">{a.depreciationRate}%</TableCell>
+  1233→  1233→              <TableCell><Badge className={statusColor(a.status)}>{a.status}</Badge></TableCell>
+  1234→  1234→            </TableRow>
+  1235→  1235→          ))}
+  1236→  1236→        </TableBody></Table>
+  1237→  1237→      </div></CardContent></Card>
+  1238→  1238→    </div>
+  1239→  1239→  )
+  1240→  1240→}
+  1241→  1241→
+  1242→  1242→// ============================================================
+  1243→  1243→// SHARES MODULE
+  1244→  1244→// ============================================================
+  1245→  1245→function SharesModule({ data, onRefresh }: { data: DashboardData; onRefresh: () => void }) {
+  1246→  1246→  return (
+  1247→  1247→    <div className="space-y-6">
+  1248→  1248→      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+  1249→  1249→        <div><h2 className="text-2xl font-bold text-gray-900">Share Management</h2><p className="text-gray-500 text-sm">शेयर व्यवस्थापन</p></div>
+  1250→  1250→        <Button className="bg-emerald-600 hover:bg-emerald-700"><Plus className="w-4 h-4 mr-2" /> Issue Shares</Button>
+  1251→  1251→      </div>
+  1252→  1252→      <Card className="border-0 shadow-sm"><CardHeader><CardTitle className="text-base">Ordinary Share / साधारण शेयर</CardTitle></CardHeader>
+  1253→  1253→      <CardContent>
+  1254→  1254→        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+  1255→  1255→          <div><p className="text-sm text-gray-500">Face Value</p><p className="text-lg font-bold">NPR 100</p></div>
+  1256→  1256→          <div><p className="text-sm text-gray-500">Total</p><p className="text-lg font-bold">{toNepaliDigits(10000)}</p></div>
+  1257→  1257→          <div><p className="text-sm text-gray-500">Issued</p><p className="text-lg font-bold text-emerald-600">{toNepaliDigits(3200)}</p></div>
+  1258→  1258→          <div><p className="text-sm text-gray-500">Available</p><p className="text-lg font-bold text-amber-600">{toNepaliDigits(6800)}</p></div>
+  1259→  1259→        </div>
+  1260→  1260→        <Progress value={32} className="mt-4 h-3" /><p className="text-xs text-gray-500 mt-1">{toNepaliDigits(32)}% issued</p>
+  1261→  1261→      </CardContent></Card>
+  1262→  1262→      <Card className="border-0 shadow-sm"><CardContent className="p-0"><div className="overflow-x-auto">
+  1263→  1263→        <Table><TableHeader><TableRow className="bg-gray-50">
+  1264→  1264→          <TableHead className="font-semibold">Member</TableHead><TableHead className="font-semibold">Shares</TableHead>
+  1265→  1265→          <TableHead className="font-semibold">Value</TableHead><TableHead className="font-semibold hidden sm:table-cell">Date</TableHead><TableHead className="font-semibold">Status</TableHead>
+  1266→  1266→        </TableRow></TableHeader><TableBody>
+  1267→  1267→          {data.shareHoldings.map(sh => (
+  1268→  1268→            <TableRow key={sh.id} className="hover:bg-gray-50">
+  1269→  1269→              <TableCell className="font-medium text-indigo-600">{sh.member ? `${sh.member.firstName} ${sh.member.lastName} (${sh.member.memberNo})` : '—'}</TableCell>
+  1270→  1270→              <TableCell>{toNepaliDigits(sh.shareCount)}</TableCell>
+  1271→  1271→              <TableCell className="font-medium">{formatNPR(sh.shareValue)}</TableCell>
+  1272→  1272→              <TableCell className="hidden sm:table-cell">{formatBSDate(sh.purchaseDate).nep}</TableCell>
+  1273→  1273→              <TableCell><Badge className={statusColor(sh.status)}>{sh.status}</Badge></TableCell>
+  1274→  1274→            </TableRow>
+  1275→  1275→          ))}
+  1276→  1276→        </TableBody></Table>
+  1277→  1277→      </div></CardContent></Card>
+  1278→  1278→    </div>
+  1279→  1279→  )
+  1280→  1280→}
+  1281→  1281→
+  1282→  1282→// ============================================================
+  1283→  1283→// MEETINGS MODULE
+  1284→  1284→// ============================================================
+  1285→  1285→function MeetingsModule({ data, onRefresh }: { data: DashboardData; onRefresh: () => void }) {
+  1286→  1286→  return (
+  1287→  1287→    <div className="space-y-6">
+  1288→  1288→      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+  1289→  1289→        <div><h2 className="text-2xl font-bold text-gray-900">Meetings</h2><p className="text-gray-500 text-sm">बैठक व्यवस्थापन</p></div>
+  1290→  1290→        <Button className="bg-emerald-600 hover:bg-emerald-700"><Plus className="w-4 h-4 mr-2" /> Schedule Meeting</Button>
+  1291→  1291→      </div>
+  1292→  1292→      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  1293→  1293→        {data.meetings.map(mt => (
+  1294→  1294→          <Card key={mt.id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
+  1295→  1295→            <CardHeader className="pb-2">
+  1296→  1296→              <div className="flex items-start justify-between">
+  1297→  1297→                <div><CardTitle className="text-base">{mt.title}</CardTitle><CardDescription className="mt-1">{mt.titleNepali}</CardDescription></div>
+  1298→  1298→                <Badge className={statusColor(mt.status)}>{mt.status}</Badge>
+  1299→  1299→              </div>
+  1300→  1300→            </CardHeader>
+  1301→  1301→            <CardContent>
+  1302→  1302→              <div className="space-y-2">
+  1303→  1303→                <div className="flex items-center gap-2 text-sm text-gray-600"><CalendarDays className="w-4 h-4" /><span>{formatBSDate(mt.date).nep} {mt.time}</span></div>
+  1304→  1304→                <div className="flex items-center gap-2 text-sm text-gray-600"><Globe className="w-4 h-4" /><span>{mt.venue}</span></div>
+  1305→  1305→                {mt.agenda && <div className="mt-3 p-3 bg-gray-50 rounded-lg"><p className="text-xs font-medium text-gray-700 mb-1">Agenda</p><p className="text-sm text-gray-600">{mt.agenda}</p></div>}
+  1306→  1306→                {mt.decisions && <div className="mt-2 p-3 bg-emerald-50 rounded-lg"><p className="text-xs font-medium text-emerald-700 mb-1">Decisions</p><p className="text-sm text-emerald-600">{mt.decisions}</p></div>}
+  1307→  1307→              </div>
+  1308→  1308→            </CardContent>
+  1309→  1309→          </Card>
+  1310→  1310→        ))}
+  1311→  1311→      </div>
+  1312→  1312→    </div>
+  1313→  1313→  )
+  1314→  1314→}
+  1315→  1315→
+  1316→  1316→// ============================================================
+  1317→  1317→// REPORTS MODULE (with NRB)
+  1318→  1318→// ============================================================
+  1319→  1319→function ReportsModule({ data }: { data: DashboardData }) {
+  1320→  1320→  const [reportData, setReportData] = useState<any>(null)
+  1321→  1321→  const [loading, setLoading] = useState(false)
+  1322→  1322→
+  1323→  1323→  const generateReport = async (type: string) => {
+  1324→  1324→    setLoading(true)
+  1325→  1325→    try {
+  1326→  1326→      const res = await fetch(`/api/reports?type=${type}`)
+  1327→  1327→      const d = await res.json()
+  1328→  1328→      setReportData({ ...d, reportType: type })
+  1329→  1329→      toast.success('Report generated! / प्रतिवेदन तयार भयो!')
+  1330→  1330→    } catch { toast.error('Failed to generate report') }
+  1331→  1331→    setLoading(false)
+  1332→  1332→  }
+  1333→  1333→
+  1334→  1334→  const reports = [
+  1335→  1335→    { name: 'Balance Sheet', nameNep: 'तल्ला पत्र', icon: FileText, color: 'bg-emerald-100 text-emerald-600', type: 'balance' },
+  1336→  1336→    { name: 'Income Statement', nameNep: 'आम्दानी खर्च', icon: TrendingUp, color: 'bg-blue-100 text-blue-600', type: 'income' },
+  1337→  1337→    { name: 'NRB Return', nameNep: 'नरब रिटर्न', icon: Shield, color: 'bg-red-100 text-red-600', type: 'nrb' },
+  1338→  1338→    { name: 'Loan Portfolio', nameNep: 'ऋण पोर्टफोलियो', icon: HandCoins, color: 'bg-rose-100 text-rose-600', type: 'loan' },
+  1339→  1339→    { name: 'Member Directory', nameNep: 'सदस्य निर्देशिका', icon: Users, color: 'bg-indigo-100 text-indigo-600', type: 'members' },
+  1340→  1340→    { name: 'Cash Flow', nameNep: 'नगद प्रवाह', icon: DollarSign, color: 'bg-teal-100 text-teal-600', type: 'cashflow' },
+  1341→  1341→    { name: 'Savings Report', nameNep: 'बचत प्रतिवेदन', icon: PiggyBank, color: 'bg-amber-100 text-amber-600', type: 'savings' },
+  1342→  1342→    { name: 'Asset Register', nameNep: 'सम्पत्ति दर्ता', icon: Building2, color: 'bg-cyan-100 text-cyan-600', type: 'assets' },
+  1343→  1343→    { name: 'HR Report', nameNep: 'मानव संसाधन', icon: UserCog, color: 'bg-orange-100 text-orange-600', type: 'hr' },
+  1344→  1344→    { name: 'Audit Trail', nameNep: 'अडिट ट्रेल', icon: BookOpen, color: 'bg-slate-100 text-slate-600', type: 'audit' },
+  1345→  1345→  ]
+  1346→  1346→
+  1347→  1347→  return (
+  1348→  1348→    <div className="space-y-6">
+  1349→  1349→      <div><h2 className="text-2xl font-bold text-gray-900">Reports & Analytics</h2><p className="text-gray-500 text-sm">प्रतिवेदन र विश्लेषण</p></div>
+  1350→  1350→
+  1351→  1351→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+  1352→  1352→        {reports.map((r, i) => (
+  1353→  1353→          <Card key={i} className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer group" onClick={() => generateReport(r.type)}>
+  1354→  1354→            <CardContent className="p-4">
+  1355→  1355→              <div className={`w-10 h-10 rounded-lg ${r.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}><r.icon className="w-5 h-5" /></div>
+  1356→  1356→              <h3 className="font-medium text-gray-900 text-sm">{r.name}</h3>
+  1357→  1357→              <p className="text-xs text-gray-400">{r.nameNep}</p>
+  1358→  1358→              <Button variant="ghost" size="sm" className="mt-2 text-xs h-7" disabled={loading}>
+  1359→  1359→                {loading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Download className="w-3 h-3 mr-1" />} Generate
+  1360→  1360→              </Button>
+  1361→  1361→            </CardContent>
+  1362→  1362→          </Card>
+  1363→  1363→        ))}
+  1364→  1364→      </div>
+  1365→  1365→
+  1366→  1366→      {reportData && (
+  1367→  1367→        <Card className="border-0 shadow-sm">
+  1368→  1368→          <CardHeader>
+  1369→  1369→            <div className="flex items-center justify-between">
+  1370→  1370→              <div>
+  1371→  1371→                <CardTitle className="text-base">
+  1372→  1372→                  {reportData.reportType === 'nrb' ? 'NRB Regulatory Report / नरब नियामक प्रतिवेदन' :
+  1373→  1373→                   reportData.reportType === 'balance' ? 'Balance Sheet / तल्ला पत्र' :
+  1374→  1374→                   reportData.reportType === 'income' ? 'Income Statement / आम्दानी खर्च विवरण' :
+  1375→  1375→                   reportData.reportType === 'cashflow' ? 'Cash Flow Statement / नगद प्रवाह विवरण' :
+  1376→  1376→                   reportData.reportType === 'loan' ? 'Loan Portfolio Report / ऋण पोर्टफोलियो' :
+  1377→  1377→                   reportData.reportType === 'savings' ? 'Savings Report / बचत प्रतिवेदन' :
+  1378→  1378→                   reportData.reportType === 'hr' ? 'HR Report / मानव संसाधन प्रतिवेदन' :
+  1379→  1379→                   reportData.reportType === 'audit' ? 'Audit Trail / अडिट ट्रेल' :
+  1380→  1380→                   reportData.reportType === 'assets' ? 'Asset Register / सम्पत्ति दर्ता' :
+  1381→  1381→                   reportData.reportType === 'members' ? 'Member Directory / सदस्य निर्देशिका' : 'Report'}
+  1382→  1382→                </CardTitle>
+  1383→  1383→                <CardDescription>FY 2082/83 | Generated: {formatBSDate(getTodayBS()).nep}</CardDescription>
+  1384→  1384→              </div>
+  1385→  1385→              <Button variant="outline" size="sm" onClick={() => setReportData(null)}><X className="w-4 h-4" /></Button>
+  1386→  1386→            </div>
+  1387→  1387→          </CardHeader>
+  1388→  1388→          <CardContent>
+  1389→  1389→            {reportData.reportType === 'nrb' && reportData.nrbReturn && (
+  1390→  1390→              <div className="space-y-6">
+  1391→  1391→                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+  1392→  1392→                  <h3 className="font-semibold text-red-800 mb-1">Nepal Rastra Bank Regulatory Return</h3>
+  1393→  1393→                  <p className="text-sm text-red-600">नेपाल राष्ट्र बैंक नियामक रिटर्न - {reportData.nrbReturn.institutionName}</p>
+  1394→  1394→                  <p className="text-xs text-red-500 mt-1">PAN: {reportData.nrbReturn.panNo} | District: {reportData.nrbReturn.district} | Province: {reportData.nrbReturn.province}</p>
+  1395→  1395→                </div>
+  1396→  1396→                {[
+  1397→  1397→                  { title: 'Capital Adequacy / पूँजी पर्याप्तता', data: reportData.nrbReturn.capitalAdequacy },
+  1398→  1398→                  { title: 'Asset Quality / सम्पत्ति गुणस्तर', data: reportData.nrbReturn.assetQuality },
+  1399→  1399→                  { title: 'Liquidity / तरलता', data: reportData.nrbReturn.liquidity },
+  1400→  1400→                  { title: 'Earnings / आम्दानी', data: reportData.nrbReturn.earnings },
+  1401→  1401→                  { title: 'Membership / सदस्यता', data: reportData.nrbReturn.membership },
+  1402→  1402→                ].map((section, i) => (
+  1403→  1403→                  <div key={i} className="border rounded-lg p-4">
+  1404→  1404→                    <h4 className="font-semibold text-gray-900 mb-3">{section.title}</h4>
+  1405→  1405→                    <div className="grid grid-cols-2 gap-3">
+  1406→  1406→                      {Object.entries(section.data).map(([key, value]) => (
+  1407→  1407→                        <div key={key} className="flex justify-between py-1.5 border-b border-gray-100">
+  1408→  1408→                          <span className="text-sm text-gray-600 capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
+  1409→  1409→                          <span className="text-sm font-medium">{typeof value === 'number' ? formatNPR(value) : String(value)}</span>
+  1410→  1410→                        </div>
+  1411→  1411→                      ))}
+  1412→  1412→                    </div>
+  1413→  1413→                  </div>
+  1414→  1414→                ))}
+  1415→  1415→              </div>
+  1416→  1416→            )}
+  1417→  1417→            {reportData.reportType === 'balance' && reportData.balanceSheet && (
+  1418→  1418→              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+  1419→  1419→                <div className="border rounded-lg p-4">
+  1420→  1420→                  <h4 className="font-semibold text-emerald-700 mb-3">Assets / सम्पत्ति</h4>
+  1421→  1421→                  {Object.entries(reportData.balanceSheet.assets).map(([k, v]) => (
+  1422→  1422→                    <div key={k} className={`flex justify-between py-2 ${k === 'totalAssets' ? 'border-t-2 font-bold text-emerald-700' : 'border-b border-gray-100'}`}>
+  1423→  1423→                      <span className="text-sm capitalize">{k.replace(/([A-Z])/g, ' $1')}</span>
+  1424→  1424→                      <span className="text-sm">{typeof v === 'number' ? formatNPR(v) : String(v)}</span>
+  1425→  1425→                    </div>
+  1426→  1426→                  ))}
+  1427→  1427→                </div>
+  1428→  1428→                <div className="border rounded-lg p-4">
+  1429→  1429→                  <h4 className="font-semibold text-rose-700 mb-3">Liabilities & Equity / दायित्व</h4>
+  1430→  1430→                  {Object.entries(reportData.balanceSheet.liabilities).map(([k, v]) => (
+  1431→  1431→                    <div key={k} className={`flex justify-between py-2 ${k === 'totalLiabilities' ? 'border-t-2 font-bold text-rose-700' : 'border-b border-gray-100'}`}>
+  1432→  1432→                      <span className="text-sm capitalize">{k.replace(/([A-Z])/g, ' $1')}</span>
+  1433→  1433→                      <span className="text-sm">{typeof v === 'number' ? formatNPR(v) : String(v)}</span>
+  1434→  1434→                    </div>
+  1435→  1435→                  ))}
+  1436→  1436→                </div>
+  1437→  1437→              </div>
+  1438→  1438→            )}
+  1439→  1439→            {reportData.reportType === 'income' && reportData.incomeStatement && (
+  1440→  1440→              <div className="space-y-4">
+  1441→  1441→                <div className="border rounded-lg p-4">
+  1442→  1442→                  <h4 className="font-semibold text-blue-700 mb-3">Income / आम्दानी</h4>
+  1443→  1443→                  {Object.entries(reportData.incomeStatement.income).map(([k, v]) => (
+  1444→  1444→                    <div key={k} className={`flex justify-between py-2 ${k === 'totalIncome' ? 'border-t-2 font-bold text-blue-700' : 'border-b border-gray-100'}`}>
+  1445→  1445→                      <span className="text-sm capitalize">{k.replace(/([A-Z])/g, ' $1')}</span>
+  1446→  1446→                      <span className="text-sm">{typeof v === 'number' ? formatNPR(v) : String(v)}</span>
+  1447→  1447→                    </div>
+  1448→  1448→                  ))}
+  1449→  1449→                </div>
+  1450→  1450→                <div className="border rounded-lg p-4">
+  1451→  1451→                  <h4 className="font-semibold text-amber-700 mb-3">Expenses / खर्च</h4>
+  1452→  1452→                  {Object.entries(reportData.incomeStatement.expenses).map(([k, v]) => (
+  1453→  1453→                    <div key={k} className={`flex justify-between py-2 ${k === 'totalExpenses' ? 'border-t-2 font-bold text-amber-700' : 'border-b border-gray-100'}`}>
+  1454→  1454→                      <span className="text-sm capitalize">{k.replace(/([A-Z])/g, ' $1')}</span>
+  1455→  1455→                      <span className="text-sm">{typeof v === 'number' ? formatNPR(v) : String(v)}</span>
+  1456→  1456→                    </div>
+  1457→  1457→                  ))}
+  1458→  1458→                </div>
+  1459→  1459→                <div className={`p-4 rounded-lg font-bold text-lg text-center ${reportData.incomeStatement.netIncome >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+  1460→  1460→                  Net Income: {formatNPR(reportData.incomeStatement.netIncome)}
+  1461→  1461→                </div>
+  1462→  1462→              </div>
+  1463→  1463→            )}
+  1464→  1464→            {reportData.reportType === 'cashflow' && reportData.cashFlow && (
+  1465→  1465→              <div className="space-y-4">
+  1466→  1466→                <div className="border rounded-lg p-4">
+  1467→  1467→                  <h4 className="font-semibold text-emerald-700 mb-3">Inflows / नगद प्रवाह</h4>
+  1468→  1468→                  {Object.entries(reportData.cashFlow.inflows).map(([k, v]) => (
+  1469→  1469→                    <div key={k} className={`flex justify-between py-2 ${k === 'totalInflows' ? 'border-t-2 font-bold' : 'border-b border-gray-100'}`}>
+  1470→  1470→                      <span className="text-sm capitalize">{k.replace(/([A-Z])/g, ' $1')}</span>
+  1471→  1471→                      <span className="text-sm">{typeof v === 'number' ? formatNPR(v) : String(v)}</span>
+  1472→  1472→                    </div>
+  1473→  1473→                  ))}
+  1474→  1474→                </div>
+  1475→  1475→                <div className="border rounded-lg p-4">
+  1476→  1476→                  <h4 className="font-semibold text-rose-700 mb-3">Outflows / नगद बहिर्वाह</h4>
+  1477→  1477→                  {Object.entries(reportData.cashFlow.outflows).map(([k, v]) => (
+  1478→  1478→                    <div key={k} className={`flex justify-between py-2 ${k === 'totalOutflows' ? 'border-t-2 font-bold' : 'border-b border-gray-100'}`}>
+  1479→  1479→                      <span className="text-sm capitalize">{k.replace(/([A-Z])/g, ' $1')}</span>
+  1480→  1480→                      <span className="text-sm">{typeof v === 'number' ? formatNPR(v) : String(v)}</span>
+  1481→  1481→                    </div>
+  1482→  1482→                  ))}
+  1483→  1483→                </div>
+  1484→  1484→                <div className={`p-4 rounded-lg font-bold text-lg text-center ${reportData.cashFlow.netCashFlow >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+  1485→  1485→                  Net Cash Flow: {formatNPR(reportData.cashFlow.netCashFlow)}
+  1486→  1486→                </div>
+  1487→  1487→              </div>
+  1488→  1488→            )}
+  1489→  1489→            {reportData.reportType === 'loan' && reportData.loanPortfolio && (
+  1490→  1490→              <div className="space-y-4">
+  1491→  1491→                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+  1492→  1492→                  <Card className="border shadow-none"><CardContent className="p-3 text-center"><p className="text-lg font-bold text-rose-600">{formatNPR(reportData.loanPortfolio.totalDisbursed)}</p><p className="text-xs text-gray-500">Disbursed</p></CardContent></Card>
+  1493→  1493→                  <Card className="border shadow-none"><CardContent className="p-3 text-center"><p className="text-lg font-bold text-amber-600">{formatNPR(reportData.loanPortfolio.totalOutstanding)}</p><p className="text-xs text-gray-500">Outstanding</p></CardContent></Card>
+  1494→  1494→                  <Card className="border shadow-none"><CardContent className="p-3 text-center"><p className="text-lg font-bold text-emerald-600">{formatNPR(reportData.loanPortfolio.totalCollected)}</p><p className="text-xs text-gray-500">Collected</p></CardContent></Card>
+  1495→  1495→                  <Card className="border shadow-none"><CardContent className="p-3 text-center"><p className="text-lg font-bold text-blue-600">{reportData.loanPortfolio.collectionRate}</p><p className="text-xs text-gray-500">Collection Rate</p></CardContent></Card>
+  1496→  1496→                </div>
+  1497→  1497→                {Object.entries(reportData.loanPortfolio.byProduct).map(([name, data]: [string, any]) => (
+  1498→  1498→                  <div key={name} className="border rounded-lg p-4">
+  1499→  1499→                    <h4 className="font-semibold text-gray-900 mb-2">{name}</h4>
+  1500→  1500→                    <div className="grid grid-cols-3 gap-4 text-sm">
+  1501→  1501→                      <div><span className="text-gray-500">Count:</span> <span className="font-medium">{data.count}</span></div>
+  1502→  1502→                      <div><span className="text-gray-500">Amount:</span> <span className="font-medium">{formatNPR(data.amount)}</span></div>
+  1503→  1503→                      <div><span className="text-gray-500">Outstanding:</span> <span className="font-medium">{formatNPR(data.outstanding)}</span></div>
+  1504→  1504→                    </div>
+  1505→  1505→                  </div>
+  1506→  1506→                ))}
+  1507→  1507→              </div>
+  1508→  1508→            )}
+  1509→  1509→            {reportData.reportType === 'members' && reportData.memberDirectory && (
+  1510→  1510→              <Card className="border shadow-none"><CardContent className="p-0"><div className="overflow-x-auto">
+  1511→  1511→                <Table><TableHeader><TableRow className="bg-gray-50">
+  1512→  1512→                  <TableHead className="font-semibold">No.</TableHead><TableHead className="font-semibold">Name</TableHead>
+  1513→  1513→                  <TableHead className="font-semibold hidden sm:table-cell">Phone</TableHead>
+  1514→  1514→                  <TableHead className="font-semibold hidden md:table-cell">Savings</TableHead>
+  1515→  1515→                  <TableHead className="font-semibold hidden md:table-cell">Loans</TableHead><TableHead className="font-semibold">Shares</TableHead>
+  1516→  1516→                </TableRow></TableHeader><TableBody>
+  1517→  1517→                  {reportData.memberDirectory.map((m: any, i: number) => (
+  1518→  1518→                    <TableRow key={i} className="hover:bg-gray-50">
+  1519→  1519→                      <TableCell className="font-medium">{m.memberNo}</TableCell>
+  1520→  1520→                      <TableCell><div>{m.name}</div>{m.nameNep && <div className="text-xs text-gray-400">{m.nameNep}</div>}</TableCell>
+  1521→  1521→                      <TableCell className="hidden sm:table-cell">{m.phone}</TableCell>
+  1522→  1522→                      <TableCell className="hidden md:table-cell">{formatNPR(m.savings)}</TableCell>
+  1523→  1523→                      <TableCell className="hidden md:table-cell">{formatNPR(m.loans)}</TableCell>
+  1524→  1524→                      <TableCell>{toNepaliDigits(m.shares)}</TableCell>
+  1525→  1525→                    </TableRow>
+  1526→  1526→                  ))}
+  1527→  1527→                </TableBody></Table>
+  1528→  1528→              </div></CardContent></Card>
+  1529→  1529→            )}
+  1530→  1530→            {!['nrb', 'balance', 'income', 'cashflow', 'loan', 'members'].includes(reportData.reportType) && (
+  1531→  1531→              <div className="text-center py-8 text-gray-400"><FileText className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>Report data generated. View in detail coming soon.</p></div>
+  1532→  1532→            )}
+  1533→  1533→          </CardContent>
+  1534→  1534→        </Card>
+  1535→  1535→      )}
+  1536→  1536→    </div>
+  1537→  1537→  )
+  1538→  1538→}
+  1539→  1539→
+  1540→  1540→// ============================================================
+  1541→  1541→// SETTINGS MODULE
+  1542→  1542→// ============================================================
+  1543→  1543→function SettingsModule({ data }: { data: DashboardData }) {
+  1544→  1544→  const [tab, setTab] = useState('organization')
+  1545→  1545→  return (
+  1546→  1546→    <div className="space-y-6">
+  1547→  1547→      <div><h2 className="text-2xl font-bold text-gray-900">Settings</h2><p className="text-gray-500 text-sm">सेटिङ र कन्फिगरेसन</p></div>
+  1548→  1548→      <Tabs value={tab} onValueChange={setTab}>
+  1549→  1549→        <TabsList>
+  1550→  1550→          <TabsTrigger value="organization">Organization</TabsTrigger>
+  1551→  1551→          <TabsTrigger value="branches">Branches</TabsTrigger>
+  1552→  1552→          <TabsTrigger value="fiscal">Fiscal Year</TabsTrigger>
+  1553→  1553→          <TabsTrigger value="users">Users</TabsTrigger>
+  1554→  1554→          <TabsTrigger value="system">System</TabsTrigger>
+  1555→  1555→        </TabsList>
+  1556→  1556→        <TabsContent value="organization" className="mt-4">
+  1557→  1557→          <Card className="border-0 shadow-sm"><CardHeader><CardTitle className="text-base">Organization Details</CardTitle><CardDescription>Manage your cooperative organization information</CardDescription></CardHeader>
+  1558→  1558→          <CardContent>
+  1559→  1559→            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  1560→  1560→              <div className="space-y-2"><Label>Organization Name</Label><Input defaultValue="Janata Sahakari Sanstha Ltd." /></div>
+  1561→  1561→              <div className="space-y-2"><Label>संस्थाको नाम</Label><Input defaultValue="जनता सहकारी संस्था लि." /></div>
+  1562→  1562→              <div className="space-y-2"><Label>Code</Label><Input defaultValue="JSS-001" /></div>
+  1563→  1563→              <div className="space-y-2"><Label>PAN No.</Label><Input defaultValue="301234567" /></div>
+  1564→  1564→              <div className="space-y-2"><Label>Province</Label>
+  1565→  1565→                <Select defaultValue="Bagmati"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{['Koshi','Madhesh','Bagmati','Gandaki','Lumbini','Karnali','Sudurpashchim'].map(p=><SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select>
+  1566→  1566→              </div>
+  1567→  1567→              <div className="space-y-2"><Label>District</Label><Input defaultValue="Kathmandu" /></div>
+  1568→  1568→            </div>
+  1569→  1569→            <Button className="mt-6 bg-emerald-600 hover:bg-emerald-700">Save Changes</Button>
+  1570→  1570→          </CardContent></Card>
+  1571→  1571→        </TabsContent>
+  1572→  1572→        <TabsContent value="fiscal" className="mt-4">
+  1573→  1573→          <Card className="border-0 shadow-sm"><CardHeader><CardTitle className="text-base">Fiscal Year / आर्थिक वर्ष</CardTitle><CardDescription>Bikram Sambat fiscal year management</CardDescription></CardHeader>
+  1574→  1574→          <CardContent>
+  1575→  1575→            <div className="space-y-3">
+  1576→  1576→              <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+  1577→  1577→                <div><p className="font-medium text-emerald-800">Fiscal Year 2082/83</p><p className="text-sm text-emerald-600">बैशाख १ - चैत्र ३०</p></div>
+  1578→  1578→                <Badge className="bg-emerald-100 text-emerald-800">Active</Badge>
+  1579→  1579→              </div>
+  1580→  1580→              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+  1581→  1581→                <div><p className="font-medium">Fiscal Year 2081/82</p><p className="text-sm text-gray-500">बैशाख १ - चैत्र ३०</p></div>
+  1582→  1582→                <Badge className="bg-gray-100 text-gray-800">Closed</Badge>
+  1583→  1583→              </div>
+  1584→  1584→            </div>
+  1585→  1585→          </CardContent></Card>
+  1586→  1586→        </TabsContent>
+  1587→  1587→        <TabsContent value="system" className="mt-4">
+  1588→  1588→          <Card className="border-0 shadow-sm"><CardHeader><CardTitle className="text-base">System Information</CardTitle></CardHeader>
+  1589→  1589→          <CardContent>
+  1590→  1590→            <div className="space-y-3">
+  1591→  1591→              <div className="flex justify-between py-2 border-b"><span className="text-gray-500">Version</span><span className="font-medium">1.0.0</span></div>
+  1592→  1592→              <div className="flex justify-between py-2 border-b"><span className="text-gray-500">Framework</span><span className="font-medium">Next.js 16</span></div>
+  1593→  1593→              <div className="flex justify-between py-2 border-b"><span className="text-gray-500">Database</span><span className="font-medium">SQLite / Prisma</span></div>
+  1594→  1594→              <div className="flex justify-between py-2 border-b"><span className="text-gray-500">Currency</span><span className="font-medium">NPR (Nepalese Rupee)</span></div>
+  1595→  1595→              <div className="flex justify-between py-2 border-b"><span className="text-gray-500">Calendar</span><span className="font-medium">Bikram Sambat (BS)</span></div>
+  1596→  1596→              <div className="flex justify-between py-2 border-b"><span className="text-gray-500">Compliance</span><span className="font-medium">Cooperative Act 2047 & NRB</span></div>
+  1597→  1597→              <div className="flex justify-between py-2"><span className="text-gray-500">PWA</span><span className="font-medium text-emerald-600">Enabled</span></div>
+  1598→  1598→            </div>
+  1599→  1599→          </CardContent></Card>
+  1600→  1600→        </TabsContent>
+  1601→  1601→        <TabsContent value="branches" className="mt-4">
+  1602→  1602→          <Card className="border-0 shadow-sm"><CardHeader><CardTitle className="text-base">Branches / शाखा</CardTitle></CardHeader>
+  1603→  1603→          <CardContent><div className="space-y-3">
+  1604→  1604→            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"><div><p className="font-medium">Main Branch - Putalisadak</p><p className="text-sm text-gray-500">BR-MAIN | Kathmandu</p></div><Badge className="bg-emerald-100 text-emerald-800">Active</Badge></div>
+  1605→  1605→            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"><div><p className="font-medium">West Branch - Kalanki</p><p className="text-sm text-gray-500">BR-WEST | Kathmandu</p></div><Badge className="bg-emerald-100 text-emerald-800">Active</Badge></div>
+  1606→  1606→          </div></CardContent></Card>
+  1607→  1607→        </TabsContent>
+  1608→  1608→        <TabsContent value="users" className="mt-4">
+  1609→  1609→          <Card className="border-0 shadow-sm"><CardHeader><CardTitle className="text-base">Users / प्रयोगकर्ता</CardTitle></CardHeader>
+  1610→  1610→          <CardContent><div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+  1611→  1611→            <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center"><span className="text-emerald-700 font-medium">RS</span></div>
+  1612→  1612→            <div><p className="font-medium">Ram Bahadur Shrestha</p><p className="text-sm text-gray-500">admin@janatasahakari.org.np</p></div></div>
+  1613→  1613→            <Badge className="bg-amber-100 text-amber-800">Admin</Badge>
+  1614→  1614→          </div></CardContent></Card>
+  1615→  1615→        </TabsContent>
+  1616→  1616→      </Tabs>
+  1617→  1617→    </div>
+  1618→  1618→  )
+  1619→  1619→}
+  1620→  1620→

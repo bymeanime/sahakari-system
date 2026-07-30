@@ -445,54 +445,33 @@ async function main() {
     })
   }
 
-  // 15. Create Journal Entries
-  await db.journalEntry.create({
-    data: {
-      voucherNo: 'JE-001',
-      date: '2082-01-15',
-      narration: 'Opening balance entry',
-      status: 'POSTED',
-      entryType: 'JOURNAL',
-      items: {
-        create: [
-          { accountId: accountMap['1110'], debit: 500000, credit: 0 },
-          { accountId: accountMap['2100'], debit: 0, credit: 500000 },
-        ],
-      },
-    },
-  })
+  // 15. Create Journal Entries (using upsert to avoid unique constraint errors)
+  const journalEntries = [
+    { voucherNo: 'JE-001', date: '2082-01-15', narration: 'Opening balance entry', status: 'POSTED', entryType: 'JOURNAL', items: [{ accountId: accountMap['1110'], debit: 500000, credit: 0 }, { accountId: accountMap['2100'], debit: 0, credit: 500000 }] },
+    { voucherNo: 'JE-002', date: '2082-01-20', narration: 'Loan disbursement', status: 'POSTED', entryType: 'PAYMENT', items: [{ accountId: accountMap['1140'], debit: 200000, credit: 0 }, { accountId: accountMap['1110'], debit: 0, credit: 200000 }] },
+    { voucherNo: 'JE-003', date: '2082-02-01', narration: 'Salary payment', status: 'POSTED', entryType: 'PAYMENT', items: [{ accountId: accountMap['4200'], debit: 180000, credit: 0 }, { accountId: accountMap['1110'], debit: 0, credit: 180000 }] },
+  ]
 
-  await db.journalEntry.create({
-    data: {
-      voucherNo: 'JE-002',
-      date: '2082-01-20',
-      narration: 'Loan disbursement',
-      status: 'POSTED',
-      entryType: 'PAYMENT',
-      items: {
-        create: [
-          { accountId: accountMap['1140'], debit: 200000, credit: 0 },
-          { accountId: accountMap['1110'], debit: 0, credit: 200000 },
-        ],
+  for (const je of journalEntries) {
+    await db.journalEntry.upsert({
+      where: { voucherNo: je.voucherNo },
+      update: {},
+      create: {
+        voucherNo: je.voucherNo,
+        date: je.date,
+        narration: je.narration,
+        status: je.status as any,
+        entryType: je.entryType as any,
+        items: {
+          create: je.items.map((item: any) => ({
+            accountId: item.accountId,
+            debit: item.debit,
+            credit: item.credit,
+          })),
+        },
       },
-    },
-  })
-
-  await db.journalEntry.create({
-    data: {
-      voucherNo: 'JE-003',
-      date: '2082-02-01',
-      narration: 'Salary payment',
-      status: 'POSTED',
-      entryType: 'PAYMENT',
-      items: {
-        create: [
-          { accountId: accountMap['4200'], debit: 180000, credit: 0 },
-          { accountId: accountMap['1110'], debit: 0, credit: 180000 },
-        ],
-      },
-    },
-  })
+    })
+  }
 
   // 16. Create Meetings
   const meetings = [
@@ -533,7 +512,56 @@ async function main() {
     },
   })
 
+  // 18. Create Users for Authentication
+  const bcrypt = require('bcryptjs')
+  const hashedPassword = await bcrypt.hash('admin123', 10)
+
+  const users = [
+    { email: 'admin@janatasahakari.org.np', name: 'Ram Bahadur Shrestha', nameNepali: 'राम बहादुर श्रेष्ठ', role: 'SUPER_ADMIN', phone: '9841234567' },
+    { email: 'manager@janatasahakari.org.np', name: 'Sita Devi Thapa', nameNepali: 'सीता देवी थापा', role: 'MANAGER', phone: '9841234568' },
+    { email: 'accountant@janatasahakari.org.np', name: 'Hari Prasad Adhikari', nameNepali: 'हरि प्रसाद अधिकारी', role: 'ACCOUNTANT', phone: '9841234569' },
+    { email: 'teller@janatasahakari.org.np', name: 'Maya Kumari Tamang', nameNepali: 'माया कुमारी तामाङ', role: 'TELLER', phone: '9841234570' },
+    { email: 'staff@janatasahakari.org.np', name: 'Bishnu Lal Maharjan', nameNepali: 'विष्णु लाल महर्जन', role: 'STAFF', phone: '9841234571' },
+  ]
+
+  for (const u of users) {
+    await db.user.upsert({
+      where: { email: u.email },
+      update: {},
+      create: {
+        email: u.email,
+        password: hashedPassword,
+        name: u.name,
+        nameNepali: u.nameNepali,
+        role: u.role,
+        phone: u.phone,
+        organizationId: ORG_ID,
+        branchId: BRANCH_ID_MAIN,
+        isActive: true,
+      },
+    })
+  }
+
+  // 19. Create Notifications
+  const notifications = [
+    { userId: 'user-admin', title: 'EMI Due Reminder', message: 'Loan LA-001 EMI of NPR 8,500 is due on 2082-04-15', type: 'WARNING' },
+    { userId: 'user-admin', title: 'Loan Application Pending', message: '3 loan applications are pending review', type: 'INFO' },
+    { userId: 'user-admin', title: 'Dormant Account Alert', message: 'Account SA-005 has been dormant for 6 months', type: 'WARNING' },
+  ]
+
+  for (const n of notifications) {
+    await db.notification.create({
+      data: {
+        userId: n.userId,
+        title: n.title,
+        message: n.message,
+        type: n.type,
+      },
+    })
+  }
+
   console.log('✅ Seeding complete! Sahakari system is ready.')
+  console.log('📧 Login credentials: admin@janatasahakari.org.np / admin123')
 }
 
 main()

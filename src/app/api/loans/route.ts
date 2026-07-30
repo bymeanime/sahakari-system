@@ -31,7 +31,25 @@ export async function POST(request: Request) {
     const body = await request.json()
 
     if (body.action === 'approve') {
-      const loan = await db.loanApplication.update({
+      // Fix 6: Check minimum share holding for loan eligibility
+      const loan = await db.loanApplication.findUnique({
+        where: { applicationNo: body.applicationNo },
+      })
+      if (!loan) {
+        return NextResponse.json({ error: 'Loan application not found' }, { status: 404 })
+      }
+      const memberShares = await db.shareHolding.aggregate({
+        where: { memberId: loan.memberId, status: 'ACTIVE' },
+        _sum: { shareCount: true },
+      })
+      if ((memberShares._sum.shareCount || 0) < 5) {
+        return NextResponse.json(
+          { error: 'Member must hold minimum shares for loan eligibility / ऋण योग्यताको लागि सदस्यले न्यूनतम शेयर राख्नुपर्छ' },
+          { status: 400 }
+        )
+      }
+
+      const approvedLoan = await db.loanApplication.update({
         where: { applicationNo: body.applicationNo },
         data: {
           status: 'APPROVED',
@@ -42,7 +60,7 @@ export async function POST(request: Request) {
           approvedBy: body.approvedBy || 'ADMIN',
         },
       })
-      return NextResponse.json(loan)
+      return NextResponse.json(approvedLoan)
     }
 
     if (body.action === 'disburse') {

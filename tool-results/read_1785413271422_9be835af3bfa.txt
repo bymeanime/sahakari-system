@@ -1,0 +1,1207 @@
+     1→// ============================================================
+     2→// Sahakari System Management - NRB Regulatory Report Generator
+     3→// Nepal Rastra Bank (NRB) Cooperative Sector Reporting
+     4→// ============================================================
+     5→// Generates regulatory reports as per NRB directives for
+     6→// savings & credit cooperative institutions (SACCOS).
+     7→//
+     8→// Report Types:
+     9→//   balance-sheet    - निश्शेष जानकारी (Balance Sheet)
+    10→//   income-statement - आय-व्यय जानकारी (Income Statement)
+    11→//   nrb-return       - नेपाल राष्ट्र बैंक रिटर्न (NRB Quarterly Return)
+    12→//   capital-adequacy - पूँजी पर्याप्तता विवरण (Capital Adequacy Report)
+    13→//   loan-portfolio   - ऋण विवरण (Loan Portfolio Report)
+    14→//   savings-report   - बचत विवरण (Savings Report)
+    15→//   member-directory - सदस्य विवरण (Member Directory)
+    16→//   cash-flow        - नगद प्रवाह विवरण (Cash Flow Statement)
+    17→//
+    18→// Query Parameters:
+    19→//   type   - Report type (required)
+    20→//   format - Output format: 'json' (default) or 'pdf'
+    21→// ============================================================
+    22→
+    23→import { db } from '@/lib/db'
+    24→import { NextResponse } from 'next/server'
+    25→
+    26→// -----------------------------------------------------------
+    27→// NRB Compliance Constants
+    28→// -----------------------------------------------------------
+    29→
+    30→const NRB_COMPLIANCE = {
+    31→  /** Minimum capital adequacy ratio for cooperatives (8%) */
+    32→  MIN_CAPITAL_ADEQUACY_RATIO: 8,
+    33→
+    34→  /** Maximum single borrower exposure as % of capital fund (25%) */
+    35→  MAX_SINGLE_BORROWER_EXPOSURE: 25,
+    36→
+    37→  /** Minimum statutory liquidity ratio (15%) */
+    38→  MIN_STATUTORY_LIQUIDITY_RATIO: 15,
+    39→
+    40→  /** NPL classification and provisioning requirements */
+    41→  NPL_CLASSIFICATION: {
+    42→    PASS: { label: 'Pass', labelNep: 'सामान्य', provision: 1, provisionNep: '१%' },
+    43→    WATCH_LIST: { label: 'Watch List', labelNep: 'सतर्कता', provision: 5, provisionNep: '५%' },
+    44→    SUB_STANDARD: { label: 'Sub-standard', labelNep: 'उप-मानक', provision: 25, provisionNep: '२५%' },
+    45→    DOUBTFUL: { label: 'Doubtful', labelNep: 'शंकास्पद', provision: 50, provisionNep: '५०%' },
+    46→    LOSS: { label: 'Loss', labelNep: 'घाटा', provision: 100, provisionNep: '१००%' },
+    47→  } as const,
+    48→
+    49→  /** Past due days thresholds for NPL classification */
+    50→  NPL_THRESHOLDS: {
+    51→    PASS: 0,           // 0 days past due
+    52→    WATCH_LIST: 30,    // 1-30 days past due
+    53→    SUB_STANDARD: 90,  // 31-90 days past due
+    54→    DOUBTFUL: 180,     // 91-180 days past due
+    55→    LOSS: 360,         // 181+ days past due
+    56→  },
+    57→} as const
+    58→
+    59→// -----------------------------------------------------------
+    60→// Helper Functions
+    61→// -----------------------------------------------------------
+    62→
+    63→function formatNPR(amount: number): string {
+    64→  return `Rs. ${amount.toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    65→}
+    66→
+    67→function toNepaliDigits(num: number | string): string {
+    68→  const nepaliDigits = ['०', '१', '२', '३', '४', '५', '६', '७', '८', '९']
+    69→  return String(num).replace(/[0-9]/g, (d) => nepaliDigits[parseInt(d)])
+    70→}
+    71→
+    72→function formatNPRNepali(amount: number): string {
+    73→  const formatted = amount.toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    74→  return `रु. ${toNepaliDigits(formatted)}`
+    75→}
+    76→
+    77→/** Get current fiscal year in BS format */
+    78→function getCurrentFiscalYear(): string {
+    79→  const today = new Date()
+    80→  const bsYear = today.getFullYear() + 57
+    81→  // BS fiscal year: if current month is after Chaitra (mid-April), next FY
+    82→  const fiscalStart = today.getMonth() + 1 > 3 ? bsYear : bsYear - 1
+    83→  return `${fiscalStart}/${(fiscalStart + 1) % 100}`
+    84→}
+    85→
+    86→/** Get previous fiscal year */
+    87→function getPreviousFiscalYear(): string {
+    88→  const current = getCurrentFiscalYear()
+    89→  const [startYear] = current.split('/').map(Number)
+    90→  return `${startYear - 1}/${startYear % 100}`
+    91→}
+    92→
+    93→/** Classify NPL based on days past due */
+    94→function classifyNPL(daysPastDue: number): keyof typeof NRB_COMPLIANCE.NPL_CLASSIFICATION {
+    95→  if (daysPastDue <= NRB_COMPLIANCE.NPL_THRESHOLDS.PASS) return 'PASS'
+    96→  if (daysPastDue <= NRB_COMPLIANCE.NPL_THRESHOLDS.WATCH_LIST) return 'WATCH_LIST'
+    97→  if (daysPastDue <= NRB_COMPLIANCE.NPL_THRESHOLDS.SUB_STANDARD) return 'SUB_STANDARD'
+    98→  if (daysPastDue <= NRB_COMPLIANCE.NPL_THRESHOLDS.DOUBTFUL) return 'DOUBTFUL'
+    99→  return 'LOSS'
+   100→}
+   101→
+   102→/** Calculate days past due from a due date string */
+   103→function getDaysPastDue(dueDate: string): number {
+   104→  const due = new Date(dueDate)
+   105→  const now = new Date()
+   106→  const diffMs = now.getTime() - due.getTime()
+   107→  return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
+   108→}
+   109→
+   110→// -----------------------------------------------------------
+   111→// Data Fetching
+   112→// -----------------------------------------------------------
+   113→
+   114→async function fetchReportData() {
+   115→  const [
+   116→    organization,
+   117→    members,
+   118→    savingsAccounts,
+   119→    savingsTransactions,
+   120→    savingsProducts,
+   121→    loanApplications,
+   122→    loanRepayments,
+   123→    loanProducts,
+   124→    shareHoldings,
+   125→    shareProducts,
+   126→    assets,
+   127→    accounts,
+   128→    journalEntries,
+   129→    journalEntryItems,
+   130→    employees,
+   131→    meetings,
+   132→    fiscalYears,
+   133→  ] = await Promise.all([
+   134→    db.organization.findFirst({ where: { isActive: true } }),
+   135→    db.member.findMany(),
+   136→    db.savingsAccount.findMany({
+   137→      include: {
+   138→        product: true,
+   139→        member: { select: { id: true, firstName: true, lastName: true, firstNameNep: true, lastNameNep: true, phone: true } },
+   140→      },
+   141→    }),
+   142→    db.savingsTransaction.findMany({ orderBy: { transactionDate: 'desc' } }),
+   143→    db.savingsProduct.findMany({ where: { isActive: true } }),
+   144→    db.loanApplication.findMany({
+   145→      include: {
+   146→        product: true,
+   147→        member: { select: { id: true, firstName: true, lastName: true, firstNameNep: true, lastNameNep: true, phone: true } },
+   148→        guarantor: { select: { id: true, firstName: true, lastName: true } },
+   149→        repayments: true,
+   150→      },
+   151→    }),
+   152→    db.loanRepayment.findMany({ orderBy: { paymentDate: 'desc' } }),
+   153→    db.loanProduct.findMany({ where: { isActive: true } }),
+   154→    db.shareHolding.findMany({
+   155→      include: {
+   156→        member: { select: { id: true, firstName: true, lastName: true, firstNameNep: true, lastNameNep: true } },
+   157→        product: true,
+   158→      },
+   159→    }),
+   160→    db.shareProduct.findMany({ where: { isActive: true } }),
+   161→    db.asset.findMany(),
+   162→    db.account.findMany({ orderBy: { code: 'asc' } }),
+   163→    db.journalEntry.findMany({
+   164→      where: { status: 'POSTED' },
+   165→      include: { items: { include: { debitAccount: true, creditAccount: true } } },
+   166→    }),
+   167→    db.journalEntryItem.findMany({
+   168→      include: { debitAccount: true, creditAccount: true },
+   169→    }),
+   170→    db.employee.findMany({ where: { isActive: true } }),
+   171→    db.meeting.findMany(),
+   172→    db.fiscalYear.findMany({ orderBy: { startDate: 'desc' } }),
+   173→  ])
+   174→
+   175→  return {
+   176→    organization,
+   177→    members,
+   178→    savingsAccounts,
+   179→    savingsTransactions,
+   180→    savingsProducts,
+   181→    loanApplications,
+   182→    loanRepayments,
+   183→    loanProducts,
+   184→    shareHoldings,
+   185→    shareProducts,
+   186→    assets,
+   187→    accounts,
+   188→    journalEntries,
+   189→    journalEntryItems,
+   190→    employees,
+   191→    meetings,
+   192→    fiscalYears,
+   193→  }
+   194→}
+   195→
+   196→// -----------------------------------------------------------
+   197→// Report Generators
+   198→// -----------------------------------------------------------
+   199→
+   200→/** Institution header - common to all NRB reports */
+   201→function getInstitutionHeader(organization: Awaited<ReturnType<typeof db.organization.findFirst>>) {
+   202→  return {
+   203→    institutionName: organization?.name || 'N/A',
+   204→    institutionNameNep: organization?.nameNepali || '',
+   205→    registrationNo: organization?.registrationNo || '',
+   206→    panNo: organization?.panNo || '',
+   207→    code: organization?.code || '',
+   208→    district: organization?.district || '',
+   209→    province: organization?.province || '',
+   210→    address: organization?.address || '',
+   211→    phone: organization?.phone || '',
+   212→    email: organization?.email || '',
+   213→    wardNo: organization?.wardNo || '',
+   214→    municipality: organization?.municipality || '',
+   215→    establishedDate: organization?.establishedDate || '',
+   216→    fiscalYear: organization?.fiscalYear || getCurrentFiscalYear(),
+   217→    reportingPeriod: getCurrentFiscalYear(),
+   218→    previousPeriod: getPreviousFiscalYear(),
+   219→    generatedAt: new Date().toISOString(),
+   220→  }
+   221→}
+   222→
+   223→// -----------------------------------------------------------
+   224→// 1. Balance Sheet (निश्शेष जानकारी)
+   225→// -----------------------------------------------------------
+   226→
+   227→function generateBalanceSheet(data: Awaited<ReturnType<typeof fetchReportData>>) {
+   228→  const header = getInstitutionHeader(data.organization)
+   229→
+   230→  // Calculate totals
+   231→  const totalSavingsDeposits = data.savingsAccounts.reduce((s, a) => s + a.balance, 0)
+   232→  const totalShareCapital = data.shareHoldings.reduce((s, sh) => s + sh.shareValue, 0)
+   233→  const totalLoanReceivable = data.loanApplications
+   234→    .filter((l) => l.status === 'DISBURSED')
+   235→    .reduce((s, l) => s + (l.outstandingAmount || 0), 0)
+   236→  const totalFixedAssets = data.assets.reduce((s, a) => s + a.currentValue, 0)
+   237→  const totalDepreciation = data.assets.reduce((s, a) => s + a.accumulatedDep, 0)
+   238→  const netFixedAssets = totalFixedAssets - totalDepreciation
+   239→
+   240→  // Accounting totals from journal entries
+   241→  const totalDebits = data.journalEntries.reduce((sum, je) => sum + je.items.reduce((s, i) => s + i.debit, 0), 0)
+   242→  const totalCredits = data.journalEntries.reduce((sum, je) => sum + je.items.reduce((s, i) => s + i.credit, 0), 0)
+   243→
+   244→  // Income & Expense for retained earnings
+   245→  const interestIncome = data.loanApplications
+   246→    .filter((l) => l.status === 'DISBURSED')
+   247→    .reduce((s, l) => s + ((l.disbursedAmount || 0) * (l.interestRate || 0)) / 100 / 12, 0)
+   248→  const interestExpense = data.savingsAccounts.reduce((s, a) => s + (a.balance * (a.product?.interestRate || 0)) / 100 / 12, 0)
+   249→  const totalSalaryExpense = data.employees.reduce((s, e) => s + e.salary, 0)
+   250→  const netIncome = interestIncome - interestExpense - totalSalaryExpense
+   251→
+   252→  // Cash & bank balance from accounts
+   253→  const cashAccounts = data.accounts.filter((a) => a.type === 'ASSET' && (a.subType === 'CASH' || a.subType === 'BANK'))
+   254→  const cashInHand = cashAccounts.filter((a) => a.subType === 'CASH').reduce((s, a) => {
+   255→    const debitTotal = data.journalEntryItems.filter((i) => i.accountId === a.id).reduce((s, i) => s + i.debit - i.credit, 0)
+   256→    return s + Math.max(0, debitTotal)
+   257→  }, 0)
+   258→  const bankBalance = cashAccounts.filter((a) => a.subType === 'BANK').reduce((s, a) => {
+   259→    const debitTotal = data.journalEntryItems.filter((i) => i.accountId === a.id).reduce((s, i) => s + i.debit - i.credit, 0)
+   260→    return s + Math.max(0, debitTotal)
+   261→  }, 0)
+   262→
+   263→  // Reserve fund (from equity accounts)
+   264→  const reserveFund = data.accounts
+   265→    .filter((a) => a.type === 'EQUITY' && a.name.toLowerCase().includes('reserve'))
+   266→    .reduce((s, a) => {
+   267→      const creditTotal = data.journalEntryItems.filter((i) => i.accountId === a.id).reduce((s, i) => s + i.credit - i.debit, 0)
+   268→      return s + Math.max(0, creditTotal)
+   269→    }, 0)
+   270→
+   271→  const totalAssets = cashInHand + bankBalance + totalLoanReceivable + netFixedAssets
+   272→  const totalLiabilities = totalSavingsDeposits + totalShareCapital + reserveFund + (netIncome > 0 ? netIncome : 0)
+   273→
+   274→  return {
+   275→    reportType: 'balance-sheet',
+   276→    reportTitle: 'Balance Sheet',
+   277→    reportTitleNep: 'निश्शेष जानकारी',
+   278→    header,
+   279→    nrbCompliance: {
+   280→      capitalAdequacyRatio: totalLoanReceivable > 0 ? ((totalShareCapital + reserveFund + (netIncome > 0 ? netIncome : 0)) / totalLoanReceivable) * 100 : 0,
+   281→      minRequiredRatio: NRB_COMPLIANCE.MIN_CAPITAL_ADEQUACY_RATIO,
+   282→      isCompliant: totalLoanReceivable > 0 ? ((totalShareCapital + reserveFund + (netIncome > 0 ? netIncome : 0)) / totalLoanReceivable) * 100 >= NRB_COMPLIANCE.MIN_CAPITAL_ADEQUACY_RATIO : true,
+   283→    },
+   284→    currentPeriod: {
+   285→      assets: {
+   286→        cashInHand: { amount: cashInHand, label: 'Cash in Hand', labelNep: 'हातमा नगद' },
+   287→        bankBalance: { amount: bankBalance, label: 'Bank Balance', labelNep: 'बैंक शेष' },
+   288→        loanReceivable: { amount: totalLoanReceivable, label: 'Loan Receivable', labelNep: 'ऋण उपलब्ध' },
+   289→        fixedAssets: { amount: netFixedAssets, label: 'Fixed Assets (Net)', labelNep: 'स्थायी सम्पत्ति (शुद्ध)' },
+   290→        totalAssets: { amount: totalAssets, label: 'Total Assets', labelNep: 'कुल सम्पत्ति' },
+   291→      },
+   292→      liabilities: {
+   293→        memberDeposits: { amount: totalSavingsDeposits, label: 'Member Deposits', labelNep: 'सदस्य निक्षेप' },
+   294→        shareCapital: { amount: totalShareCapital, label: 'Share Capital', labelNep: 'शेयर पूँजी' },
+   295→        reserveFund: { amount: reserveFund, label: 'Reserve Fund', labelNep: 'आरक्ष कोष' },
+   296→        retainedEarnings: { amount: netIncome > 0 ? netIncome : 0, label: 'Retained Earnings', labelNep: 'सञ्चित आय' },
+   297→        totalLiabilities: { amount: totalLiabilities, label: 'Total Liabilities & Equity', labelNep: 'कुल दायित्व र पूँजी' },
+   298→      },
+   299→    },
+   300→    previousPeriod: {
+   301→      // Previous year comparison (placeholder - would need historical data)
+   302→      note: 'Previous year figures require historical data from prior fiscal year records.',
+   303→    },
+   304→    summary: {
+   305→      totalAssets,
+   306→      totalLiabilities,
+   307→      surplus: totalAssets - totalLiabilities,
+   308→      isBalanced: Math.abs(totalAssets - totalLiabilities) < 1,
+   309→    },
+   310→    currency: 'NPR',
+   311→    currencyNep: 'नेपाली रूपैयाँ',
+   312→  }
+   313→}
+   314→
+   315→// -----------------------------------------------------------
+   316→// 2. Income Statement (आय-व्यय जानकारी)
+   317→// -----------------------------------------------------------
+   318→
+   319→function generateIncomeStatement(data: Awaited<ReturnType<typeof fetchReportData>>) {
+   320→  const header = getInstitutionHeader(data.organization)
+   321→
+   322→  // Income calculations
+   323→  const interestIncome = data.loanApplications
+   324→    .filter((l) => l.status === 'DISBURSED')
+   325→    .reduce((s, l) => s + ((l.disbursedAmount || 0) * (l.interestRate || 0)) / 100 / 12, 0)
+   326→  const feeIncome = data.loanApplications
+   327→    .filter((l) => l.status !== 'PENDING')
+   328→    .reduce((s, l) => s + (l.product?.processingFee || 0), 0)
+   329→  const penaltyIncome = data.loanRepayments.reduce((s, r) => s + r.penaltyAmount, 0)
+   330→
+   331→  // Expense calculations
+   332→  const interestExpense = data.savingsAccounts.reduce((s, a) => s + (a.balance * (a.product?.interestRate || 0)) / 100 / 12, 0)
+   333→  const totalSalaryExpense = data.employees.reduce((s, e) => s + e.salary, 0)
+   334→  const totalDepreciation = data.assets.reduce((s, a) => s + a.accumulatedDep, 0) / 5
+   335→  const officeExpense = data.accounts
+   336→    .filter((a) => a.type === 'EXPENSE' && a.name.toLowerCase().includes('office'))
+   337→    .reduce((s, a) => {
+   338→      const debitTotal = data.journalEntryItems.filter((i) => i.accountId === a.id).reduce((s, i) => s + i.debit, 0)
+   339→      return s + debitTotal
+   340→    }, 0)
+   341→
+   342→  const totalIncome = interestIncome + feeIncome + penaltyIncome
+   343→  const totalExpenses = interestExpense + totalSalaryExpense + officeExpense + totalDepreciation
+   344→  const netIncome = totalIncome - totalExpenses
+   345→
+   346→  return {
+   347→    reportType: 'income-statement',
+   348→    reportTitle: 'Income Statement',
+   349→    reportTitleNep: 'आय-व्यय जानकारी',
+   350→    header,
+   351→    currentPeriod: {
+   352→      income: {
+   353→        interestIncome: { amount: Math.round(interestIncome), label: 'Interest Income', labelNep: 'ब्याज आय' },
+   354→        feeIncome: { amount: Math.round(feeIncome), label: 'Fee & Commission Income', labelNep: 'शुल्क तथा कमिसन आय' },
+   355→        penaltyIncome: { amount: Math.round(penaltyIncome), label: 'Penalty Income', labelNep: 'जरिवाना आय' },
+   356→        otherIncome: { amount: 0, label: 'Other Income', labelNep: 'अन्य आय' },
+   357→        totalIncome: { amount: Math.round(totalIncome), label: 'Total Income', labelNep: 'कुल आय' },
+   358→      },
+   359→      expenses: {
+   360→        interestExpense: { amount: Math.round(interestExpense), label: 'Interest Expense', labelNep: 'ब्याज खर्च' },
+   361→        salaryExpense: { amount: Math.round(totalSalaryExpense), label: 'Salary & Benefits', labelNep: 'तलब तथा भत्ता' },
+   362→        officeExpense: { amount: Math.round(officeExpense), label: 'Office & Administrative', labelNep: 'कार्यालय तथा प्रशासनिक' },
+   363→        depreciation: { amount: Math.round(totalDepreciation), label: 'Depreciation', labelNep: 'ह्रासकट्टी' },
+   364→        otherExpenses: { amount: 0, label: 'Other Expenses', labelNep: 'अन्य खर्च' },
+   365→        totalExpenses: { amount: Math.round(totalExpenses), label: 'Total Expenses', labelNep: 'कुल खर्च' },
+   366→      },
+   367→      netIncome: {
+   368→        amount: Math.round(netIncome),
+   369→        label: 'Net Income / (Loss)',
+   370→        labelNep: 'खुद आय / (घाटा)',
+   371→      },
+   372→    },
+   373→    previousPeriod: {
+   374→      note: 'Previous year figures require historical data from prior fiscal year records.',
+   375→    },
+   376→    keyRatios: {
+   377→      returnOnAssets: data.assets.reduce((s, a) => s + a.currentValue, 0) > 0
+   378→        ? ((netIncome / data.assets.reduce((s, a) => s + a.currentValue, 0)) * 100).toFixed(2) + '%'
+   379→        : 'N/A',
+   380→      netInterestMargin: totalIncome > 0
+   381→        ? (((interestIncome - interestExpense) / totalIncome) * 100).toFixed(2) + '%'
+   382→        : 'N/A',
+   383→      operatingRatio: totalIncome > 0
+   384→        ? ((totalExpenses / totalIncome) * 100).toFixed(2) + '%'
+   385→        : 'N/A',
+   386→    },
+   387→    currency: 'NPR',
+   388→    currencyNep: 'नेपाली रूपैयाँ',
+   389→  }
+   390→}
+   391→
+   392→// -----------------------------------------------------------
+   393→// 3. NRB Quarterly Return (नेपाल राष्ट्र बैंक रिटर्न)
+   394→// -----------------------------------------------------------
+   395→
+   396→function generateNRBReturn(data: Awaited<ReturnType<typeof fetchReportData>>) {
+   397→  const header = getInstitutionHeader(data.organization)
+   398→
+   399→  const totalSavingsDeposits = data.savingsAccounts.reduce((s, a) => s + a.balance, 0)
+   400→  const totalShareCapital = data.shareHoldings.reduce((s, sh) => s + sh.shareValue, 0)
+   401→  const totalLoansDisbursed = data.loanApplications
+   402→    .filter((l) => l.status === 'DISBURSED')
+   403→    .reduce((s, l) => s + (l.disbursedAmount || 0), 0)
+   404→  const totalOutstanding = data.loanApplications
+   405→    .filter((l) => l.status === 'DISBURSED')
+   406→    .reduce((s, l) => s + (l.outstandingAmount || 0), 0)
+   407→  const totalCollected = totalLoansDisbursed - totalOutstanding
+   408→  const totalFixedAssets = data.assets.reduce((s, a) => s + a.currentValue, 0)
+   409→  const totalSalaryExpense = data.employees.reduce((s, e) => s + e.salary, 0)
+   410→  const interestIncome = data.loanApplications
+   411→    .filter((l) => l.status === 'DISBURSED')
+   412→    .reduce((s, l) => s + ((l.disbursedAmount || 0) * (l.interestRate || 0)) / 100 / 12, 0)
+   413→  const interestExpense = data.savingsAccounts.reduce((s, a) => s + (a.balance * (a.product?.interestRate || 0)) / 100 / 12, 0)
+   414→  const netIncome = interestIncome - interestExpense - totalSalaryExpense
+   415→
+   416→  // NPL classification
+   417→  const overdueRepayments = data.loanRepayments.filter((r) => r.status === 'OVERDUE')
+   418→  const nplByClassification: Record<string, { count: number; amount: number; provision: number }> = {
+   419→    PASS: { count: 0, amount: 0, provision: 0 },
+   420→    WATCH_LIST: { count: 0, amount: 0, provision: 0 },
+   421→    SUB_STANDARD: { count: 0, amount: 0, provision: 0 },
+   422→    DOUBTFUL: { count: 0, amount: 0, provision: 0 },
+   423→    LOSS: { count: 0, amount: 0, provision: 0 },
+   424→  }
+   425→
+   426→  // Classify overdue loans
+   427→  const disbursedLoans = data.loanApplications.filter((l) => l.status === 'DISBURSED')
+   428→  disbursedLoans.forEach((loan) => {
+   429→    const overdueRepaymentsForLoan = loan.repayments.filter((r) => r.status === 'OVERDUE' || r.status === 'PENDING')
+   430→    if (overdueRepaymentsForLoan.length > 0) {
+   431→      const earliestOverdue = overdueRepaymentsForLoan.sort((a, b) => a.paymentDate.localeCompare(b.paymentDate))[0]
+   432→      const daysPastDue = getDaysPastDue(earliestOverdue.paymentDate)
+   433→      const classification = classifyNPL(daysPastDue)
+   434→      const outstanding = loan.outstandingAmount || 0
+   435→      const provisionRate = NRB_COMPLIANCE.NPL_CLASSIFICATION[classification].provision / 100
+   436→
+   437→      nplByClassification[classification].count++
+   438→      nplByClassification[classification].amount += outstanding
+   439→      nplByClassification[classification].provision += outstanding * provisionRate
+   440→    } else {
+   441→      // Performing loan
+   442→      const outstanding = loan.outstandingAmount || 0
+   443→      nplByClassification.PASS.count++
+   444→      nplByClassification.PASS.amount += outstanding
+   445→      nplByClassification.PASS.provision += outstanding * 0.01 // 1% general provision
+   446→    }
+   447→  })
+   448→
+   449→  const totalNPL = nplByClassification.WATCH_LIST.amount + nplByClassification.SUB_STANDARD.amount + nplByClassification.DOUBTFUL.amount + nplByClassification.LOSS.amount
+   450→  const totalProvisions = Object.values(nplByClassification).reduce((s, c) => s + c.provision, 0)
+   451→  const nplRatio = totalLoansDisbursed > 0 ? (totalNPL / totalLoansDisbursed) * 100 : 0
+   452→
+   453→  // Capital adequacy
+   454→  const capitalFund = totalShareCapital + (netIncome > 0 ? netIncome : 0)
+   455→  const capitalAdequacyRatio = totalLoansDisbursed > 0 ? (capitalFund / totalLoansDisbursed) * 100 : 0
+   456→
+   457→  // Single borrower exposure
+   458→  const memberLoanExposure = disbursedLoans.reduce((acc: Record<string, number>, loan) => {
+   459→    const memberId = loan.memberId
+   460→    acc[memberId] = (acc[memberId] || 0) + (loan.outstandingAmount || 0)
+   461→    return acc
+   462→  }, {})
+   463→  const maxSingleExposure = Math.max(...Object.values(memberLoanExposure), 0)
+   464→  const singleBorrowerRatio = capitalFund > 0 ? (maxSingleExposure / capitalFund) * 100 : 0
+   465→
+   466→  // Liquidity
+   467→  const liquidAssets = totalSavingsDeposits * 0.15 // simplified
+   468→  const liquidityRatio = totalSavingsDeposits > 0 ? (liquidAssets / totalSavingsDeposits) * 100 : 0
+   469→
+   470→  return {
+   471→    reportType: 'nrb-return',
+   472→    reportTitle: 'NRB Quarterly Return',
+   473→    reportTitleNep: 'नेपाल राष्ट्र बैंक रिटर्न',
+   474→    header,
+   475→    capitalAdequacy: {
+   476→      shareCapital: { amount: totalShareCapital, label: 'Share Capital', labelNep: 'शेयर पूँजी' },
+   477→      reserveFund: { amount: 0, label: 'Reserve Fund', labelNep: 'आरक्ष कोष' },
+   478→      retainedEarnings: { amount: netIncome > 0 ? Math.round(netIncome) : 0, label: 'Retained Earnings', labelNep: 'सञ्चित आय' },
+   479→      totalCapitalFund: { amount: Math.round(capitalFund), label: 'Total Capital Fund', labelNep: 'कुल पूँजी कोष' },
+   480→      riskWeightedAssets: { amount: Math.round(totalLoansDisbursed), label: 'Risk-Weighted Assets', labelNep: 'जोखिम-भारित सम्पत्ति' },
+   481→      capitalAdequacyRatio: {
+   482→        value: capitalAdequacyRatio.toFixed(2) + '%',
+   483→        minimum: NRB_COMPLIANCE.MIN_CAPITAL_ADEQUACY_RATIO + '%',
+   484→        isCompliant: capitalAdequacyRatio >= NRB_COMPLIANCE.MIN_CAPITAL_ADEQUACY_RATIO,
+   485→      },
+   486→    },
+   487→    assetQuality: {
+   488→      totalLoans: { amount: Math.round(totalLoansDisbursed), label: 'Total Loans', labelNep: 'कुल ऋण' },
+   489→      performingLoans: { amount: Math.round(nplByClassification.PASS.amount), label: 'Performing Loans', labelNep: 'सामान्य ऋण' },
+   490→      nonPerformingLoans: { amount: Math.round(totalNPL), label: 'Non-Performing Loans', labelNep: 'नष्ट हुने ऋण' },
+   491→      nplRatio: {
+   492→        value: nplRatio.toFixed(2) + '%',
+   493→        label: 'NPL Ratio',
+   494→        labelNep: 'NPL अनुपात',
+   495→      },
+   496→      nplClassification: Object.entries(nplByClassification).map(([key, val]) => ({
+   497→        classification: NRB_COMPLIANCE.NPL_CLASSIFICATION[key as keyof typeof NRB_COMPLIANCE.NPL_CLASSIFICATION].label,
+   498→        classificationNep: NRB_COMPLIANCE.NPL_CLASSIFICATION[key as keyof typeof NRB_COMPLIANCE.NPL_CLASSIFICATION].labelNep,
+   499→        count: val.count,
+   500→        amount: Math.round(val.amount),
+   501→        provisionRate: NRB_COMPLIANCE.NPL_CLASSIFICATION[key as keyof typeof NRB_COMPLIANCE.NPL_CLASSIFICATION].provision + '%',
+   502→        provisionRateNep: NRB_COMPLIANCE.NPL_CLASSIFICATION[key as keyof typeof NRB_COMPLIANCE.NPL_CLASSIFICATION].provisionNep,
+   503→        provisionAmount: Math.round(val.provision),
+   504→      })),
+   505→      totalProvisions: { amount: Math.round(totalProvisions), label: 'Total Loan Loss Provisions', labelNep: 'कुल ऋण नोक्सानी बन्दोबस्त' },
+   506→    },
+   507→    singleBorrowerExposure: {
+   508→      maxSingleExposure: { amount: Math.round(maxSingleExposure), label: 'Maximum Single Borrower Exposure', labelNep: 'अधिकतम एकल ऋणी जोखिम' },
+   509→      capitalFund: { amount: Math.round(capitalFund), label: 'Capital Fund', labelNep: 'पूँजी कोष' },
+   510→      exposureRatio: {
+   511→        value: singleBorrowerRatio.toFixed(2) + '%',
+   512→        maximum: NRB_COMPLIANCE.MAX_SINGLE_BORROWER_EXPOSURE + '%',
+   513→        isCompliant: singleBorrowerRatio <= NRB_COMPLIANCE.MAX_SINGLE_BORROWER_EXPOSURE,
+   514→      },
+   515→    },
+   516→    liquidity: {
+   517→      totalDeposits: { amount: Math.round(totalSavingsDeposits), label: 'Total Deposits', labelNep: 'कुल निक्षेप' },
+   518→      liquidAssets: { amount: Math.round(liquidAssets), label: 'Liquid Assets', labelNep: 'तरल सम्पत्ति' },
+   519→      statutoryLiquidityRatio: {
+   520→        value: liquidityRatio.toFixed(2) + '%',
+   521→        minimum: NRB_COMPLIANCE.MIN_STATUTORY_LIQUIDITY_RATIO + '%',
+   522→        isCompliant: liquidityRatio >= NRB_COMPLIANCE.MIN_STATUTORY_LIQUIDITY_RATIO,
+   523→      },
+   524→    },
+   525→    earnings: {
+   526→      interestIncome: { amount: Math.round(interestIncome), label: 'Interest Income', labelNep: 'ब्याज आय' },
+   527→      interestExpense: { amount: Math.round(interestExpense), label: 'Interest Expense', labelNep: 'ब्याज खर्च' },
+   528→      netInterestMargin: { amount: Math.round(interestIncome - interestExpense), label: 'Net Interest Margin', labelNep: 'खुद ब्याज अन्तर' },
+   529→      operatingExpense: { amount: Math.round(totalSalaryExpense), label: 'Operating Expense', labelNep: 'सञ्चालन खर्च' },
+   530→      returnOnAssets: totalFixedAssets > 0 ? ((netIncome / totalFixedAssets) * 100).toFixed(2) + '%' : 'N/A',
+   531→    },
+   532→    membership: {
+   533→      totalMembers: data.members.length,
+   534→      activeMembers: data.members.filter((m) => m.status === 'ACTIVE').length,
+   535→      inactiveMembers: data.members.filter((m) => m.status === 'INACTIVE').length,
+   536→      femaleMembers: data.members.filter((m) => m.gender === 'FEMALE').length,
+   537→      maleMembers: data.members.filter((m) => m.gender === 'MALE').length,
+   538→      shareHolders: data.shareHoldings.length,
+   539→    },
+   540→    complianceSummary: {
+   541→      capitalAdequacyCompliant: capitalAdequacyRatio >= NRB_COMPLIANCE.MIN_CAPITAL_ADEQUACY_RATIO,
+   542→      singleBorrowerExposureCompliant: singleBorrowerRatio <= NRB_COMPLIANCE.MAX_SINGLE_BORROWER_EXPOSURE,
+   543→      statutoryLiquidityCompliant: liquidityRatio >= NRB_COMPLIANCE.MIN_STATUTORY_LIQUIDITY_RATIO,
+   544→      overallCompliant: capitalAdequacyRatio >= NRB_COMPLIANCE.MIN_CAPITAL_ADEQUACY_RATIO
+   545→        && singleBorrowerRatio <= NRB_COMPLIANCE.MAX_SINGLE_BORROWER_EXPOSURE
+   546→        && liquidityRatio >= NRB_COMPLIANCE.MIN_STATUTORY_LIQUIDITY_RATIO,
+   547→    },
+   548→    currency: 'NPR',
+   549→    currencyNep: 'नेपाली रूपैयाँ',
+   550→  }
+   551→}
+   552→
+   553→// -----------------------------------------------------------
+   554→// 4. Capital Adequacy Report (पूँजी पर्याप्तता विवरण)
+   555→// -----------------------------------------------------------
+   556→
+   557→function generateCapitalAdequacy(data: Awaited<ReturnType<typeof fetchReportData>>) {
+   558→  const header = getInstitutionHeader(data.organization)
+   559→
+   560→  const totalShareCapital = data.shareHoldings.reduce((s, sh) => s + sh.shareValue, 0)
+   561→  const totalLoansDisbursed = data.loanApplications
+   562→    .filter((l) => l.status === 'DISBURSED')
+   563→    .reduce((s, l) => s + (l.disbursedAmount || 0), 0)
+   564→  const totalOutstanding = data.loanApplications
+   565→    .filter((l) => l.status === 'DISBURSED')
+   566→    .reduce((s, l) => s + (l.outstandingAmount || 0), 0)
+   567→
+   568→  const interestIncome = data.loanApplications
+   569→    .filter((l) => l.status === 'DISBURSED')
+   570→    .reduce((s, l) => s + ((l.disbursedAmount || 0) * (l.interestRate || 0)) / 100 / 12, 0)
+   571→  const interestExpense = data.savingsAccounts.reduce((s, a) => s + (a.balance * (a.product?.interestRate || 0)) / 100 / 12, 0)
+   572→  const totalSalaryExpense = data.employees.reduce((s, e) => s + e.salary, 0)
+   573→  const netIncome = interestIncome - interestExpense - totalSalaryExpense
+   574→
+   575→  // Capital components
+   576→  const tier1Capital = totalShareCapital + (netIncome > 0 ? netIncome : 0)
+   577→  const tier2Capital = 0 // Subordinated debt, etc. - not applicable for most cooperatives
+   578→  const totalCapital = tier1Capital + tier2Capital
+   579→
+   580→  // Risk-weighted assets calculation
+   581→  const riskWeights = {
+   582→    cashAndBank: { weight: 0, label: 'Cash & Bank Balances', labelNep: 'नगद तथा बैंक शेष' },
+   583→    govtSecurities: { weight: 0, label: 'Government Securities', labelNep: 'सरकारी प्रतिभूति' },
+   584→    performingLoans: { weight: 100, label: 'Performing Loans', labelNep: 'सामान्य ऋण' },
+   585→    watchListLoans: { weight: 100, label: 'Watch List Loans', labelNep: 'सतर्कता ऋण' },
+   586→    subStandardLoans: { weight: 100, label: 'Sub-standard Loans', labelNep: 'उप-मानक ऋण' },
+   587→    doubtfulLoans: { weight: 100, label: 'Doubtful Loans', labelNep: 'शंकास्पद ऋण' },
+   588→    lossLoans: { weight: 100, label: 'Loss Loans', labelNep: 'घाटा ऋण' },
+   589→    fixedAssets: { weight: 100, label: 'Fixed Assets', labelNep: 'स्थायी सम्पत्ति' },
+   590→    otherAssets: { weight: 100, label: 'Other Assets', labelNep: 'अन्य सम्पत्ति' },
+   591→  }
+   592→
+   593→  const totalFixedAssets = data.assets.reduce((s, a) => s + a.currentValue, 0)
+   594→  const totalRiskWeightedAssets = totalOutstanding + totalFixedAssets // simplified: all at 100% risk weight
+   595→
+   596→  const capitalAdequacyRatio = totalRiskWeightedAssets > 0 ? (totalCapital / totalRiskWeightedAssets) * 100 : 0
+   597→
+   598→  return {
+   599→    reportType: 'capital-adequacy',
+   600→    reportTitle: 'Capital Adequacy Report',
+   601→    reportTitleNep: 'पूँजी पर्याप्तता विवरण',
+   602→    header,
+   603→    capitalStructure: {
+   604→      tier1Capital: {
+   605→        paidUpCapital: { amount: totalShareCapital, label: 'Paid-up Share Capital', labelNep: 'चुक्ता शेयर पूँजी' },
+   606→        reserveFund: { amount: 0, label: 'Statutory Reserve Fund', labelNep: 'सांविधिक आरक्ष कोष' },
+   607→        retainedEarnings: { amount: netIncome > 0 ? Math.round(netIncome) : 0, label: 'Retained Earnings', labelNep: 'सञ्चित आय' },
+   608→        totalTier1: { amount: Math.round(tier1Capital), label: 'Total Tier 1 Capital', labelNep: 'कुल तह १ पूँजी' },
+   609→      },
+   610→      tier2Capital: {
+   611→        subordinatedDebt: { amount: 0, label: 'Subordinated Debt', labelNep: 'अधीनस्थ ऋण' },
+   612→        generalProvision: { amount: 0, label: 'General Provision (excess)', labelNep: 'सामान्य बन्दोबस्त (अतिरिक्त)' },
+   613→        totalTier2: { amount: tier2Capital, label: 'Total Tier 2 Capital', labelNep: 'कुल तह २ पूँजी' },
+   614→      },
+   615→      totalCapital: { amount: Math.round(totalCapital), label: 'Total Capital Fund', labelNep: 'कुल पूँजी कोष' },
+   616→    },
+   617→    riskWeightedAssets: {
+   618→      items: Object.entries(riskWeights).map(([key, val]) => {
+   619→        let amount = 0
+   620→        if (key === 'performingLoans') amount = totalOutstanding
+   621→        else if (key === 'fixedAssets') amount = totalFixedAssets
+   622→        else if (key === 'otherAssets') amount = 0
+   623→        return {
+   624→          ...val,
+   625→          grossAmount: amount,
+   626→          riskWeight: val.weight + '%',
+   627→          riskWeightedAmount: (amount * val.weight) / 100,
+   628→        }
+   629→      }),
+   630→      totalRiskWeightedAssets: { amount: Math.round(totalRiskWeightedAssets), label: 'Total Risk-Weighted Assets', labelNep: 'कुल जोखिम-भारित सम्पत्ति' },
+   631→    },
+   632→    capitalAdequacyRatio: {
+   633→      current: capitalAdequacyRatio.toFixed(2) + '%',
+   634→      minimumRequired: NRB_COMPLIANCE.MIN_CAPITAL_ADEQUACY_RATIO + '%',
+   635→      surplus: Math.max(0, capitalAdequacyRatio - NRB_COMPLIANCE.MIN_CAPITAL_ADEQUACY_RATIO).toFixed(2) + '%',
+   636→      deficit: Math.max(0, NRB_COMPLIANCE.MIN_CAPITAL_ADEQUACY_RATIO - capitalAdequacyRatio).toFixed(2) + '%',
+   637→      isCompliant: capitalAdequacyRatio >= NRB_COMPLIANCE.MIN_CAPITAL_ADEQUACY_RATIO,
+   638→      requiredCapital: Math.round((totalRiskWeightedAssets * NRB_COMPLIANCE.MIN_CAPITAL_ADEQUACY_RATIO) / 100),
+   639→      currentCapital: Math.round(totalCapital),
+   640→    },
+   641→    currency: 'NPR',
+   642→    currencyNep: 'नेपाली रूपैयाँ',
+   643→  }
+   644→}
+   645→
+   646→// -----------------------------------------------------------
+   647→// 5. Loan Portfolio Report (ऋण विवरण)
+   648→// -----------------------------------------------------------
+   649→
+   650→function generateLoanPortfolio(data: Awaited<ReturnType<typeof fetchReportData>>) {
+   651→  const header = getInstitutionHeader(data.organization)
+   652→
+   653→  const disbursedLoans = data.loanApplications.filter((l) => l.status === 'DISBURSED')
+   654→  const totalDisbursed = disbursedLoans.reduce((s, l) => s + (l.disbursedAmount || 0), 0)
+   655→  const totalOutstanding = disbursedLoans.reduce((s, l) => s + (l.outstandingAmount || 0), 0)
+   656→  const totalCollected = totalDisbursed - totalOutstanding
+   657→
+   658→  // By product type
+   659→  const byProduct = disbursedLoans.reduce((acc: Record<string, { count: number; disbursed: number; outstanding: number; interestRate: number }>, l) => {
+   660→    const key = l.product?.name || 'Unknown'
+   661→    if (!acc[key]) acc[key] = { count: 0, disbursed: 0, outstanding: 0, interestRate: 0 }
+   662→    acc[key].count++
+   663→    acc[key].disbursed += l.disbursedAmount || 0
+   664→    acc[key].outstanding += l.outstandingAmount || 0
+   665→    acc[key].interestRate = l.product?.interestRate || 0
+   666→    return acc
+   667→  }, {})
+   668→
+   669→  // By purpose
+   670→  const byPurpose = disbursedLoans.reduce((acc: Record<string, { count: number; amount: number }>, l) => {
+   671→    const key = l.purpose || 'General'
+   672→    if (!acc[key]) acc[key] = { count: 0, amount: 0 }
+   673→    acc[key].count++
+   674→    acc[key].amount += l.disbursedAmount || 0
+   675→    return acc
+   676→  }, {})
+   677→
+   678→  // NPL classification
+   679→  const nplBreakdown: Record<string, { count: number; amount: number; provision: number }> = {
+   680→    PASS: { count: 0, amount: 0, provision: 0 },
+   681→    WATCH_LIST: { count: 0, amount: 0, provision: 0 },
+   682→    SUB_STANDARD: { count: 0, amount: 0, provision: 0 },
+   683→    DOUBTFUL: { count: 0, amount: 0, provision: 0 },
+   684→    LOSS: { count: 0, amount: 0, provision: 0 },
+   685→  }
+   686→
+   687→  disbursedLoans.forEach((loan) => {
+   688→    const overdueRepayments = loan.repayments.filter((r) => r.status === 'OVERDUE' || r.status === 'PENDING')
+   689→    if (overdueRepayments.length > 0) {
+   690→      const earliestOverdue = overdueRepayments.sort((a, b) => a.paymentDate.localeCompare(b.paymentDate))[0]
+   691→      const daysPastDue = getDaysPastDue(earliestOverdue.paymentDate)
+   692→      const classification = classifyNPL(daysPastDue)
+   693→      const outstanding = loan.outstandingAmount || 0
+   694→      const provisionRate = NRB_COMPLIANCE.NPL_CLASSIFICATION[classification].provision / 100
+   695→
+   696→      nplBreakdown[classification].count++
+   697→      nplBreakdown[classification].amount += outstanding
+   698→      nplBreakdown[classification].provision += outstanding * provisionRate
+   699→    } else {
+   700→      const outstanding = loan.outstandingAmount || 0
+   701→      nplBreakdown.PASS.count++
+   702→      nplBreakdown.PASS.amount += outstanding
+   703→      nplBreakdown.PASS.provision += outstanding * 0.01
+   704→    }
+   705→  })
+   706→
+   707→  // By member (top borrowers)
+   708→  const memberLoans = disbursedLoans.reduce((acc: Record<string, { name: string; outstanding: number; count: number }>, l) => {
+   709→    const memberId = l.memberId
+   710→    const name = `${l.member?.firstName || ''} ${l.member?.lastName || ''}`
+   711→    if (!acc[memberId]) acc[memberId] = { name, outstanding: 0, count: 0 }
+   712→    acc[memberId].outstanding += l.outstandingAmount || 0
+   713→    acc[memberId].count++
+   714→    return acc
+   715→  }, {})
+   716→
+   717→  const topBorrowers = Object.values(memberLoans)
+   718→    .sort((a, b) => b.outstanding - a.outstanding)
+   719→    .slice(0, 20)
+   720→
+   721→  // Guarantor analysis
+   722→  const guaranteedLoans = disbursedLoans.filter((l) => l.guarantorId)
+   723→  const totalGuaranteedAmount = guaranteedLoans.reduce((s, l) => s + (l.outstandingAmount || 0), 0)
+   724→
+   725→  // Collection rate
+   726→  const collectionRate = totalDisbursed > 0 ? ((totalCollected / totalDisbursed) * 100).toFixed(1) : '0.0'
+   727→
+   728→  // Overdue loans detail
+   729→  const overdueLoans = disbursedLoans
+   730→    .filter((l) => l.repayments.some((r) => r.status === 'OVERDUE' || r.status === 'PENDING'))
+   731→    .map((l) => {
+   732→      const overdueRepayments = l.repayments.filter((r) => r.status === 'OVERDUE' || r.status === 'PENDING')
+   733→      const daysPastDue = overdueRepayments.length > 0
+   734→        ? getDaysPastDue(overdueRepayments.sort((a, b) => a.paymentDate.localeCompare(b.paymentDate))[0].paymentDate)
+   735→        : 0
+   736→      return {
+   737→        applicationNo: l.applicationNo,
+   738→        memberName: `${l.member?.firstName || ''} ${l.member?.lastName || ''}`,
+   739→        disbursedAmount: l.disbursedAmount || 0,
+   740→        outstandingAmount: l.outstandingAmount || 0,
+   741→        daysPastDue,
+   742→        nplClassification: NRB_COMPLIANCE.NPL_CLASSIFICATION[classifyNPL(daysPastDue)].label,
+   743→        nplClassificationNep: NRB_COMPLIANCE.NPL_CLASSIFICATION[classifyNPL(daysPastDue)].labelNep,
+   744→        provisionRequired: (l.outstandingAmount || 0) * NRB_COMPLIANCE.NPL_CLASSIFICATION[classifyNPL(daysPastDue)].provision / 100,
+   745→        nextDueDate: l.nextDueDate || 'N/A',
+   746→      }
+   747→    })
+   748→
+   749→  return {
+   750→    reportType: 'loan-portfolio',
+   751→    reportTitle: 'Loan Portfolio Report',
+   752→    reportTitleNep: 'ऋण विवरण',
+   753→    header,
+   754→    summary: {
+   755→      totalDisbursed: { amount: Math.round(totalDisbursed), label: 'Total Disbursed', labelNep: 'कुल वितरण' },
+   756→      totalOutstanding: { amount: Math.round(totalOutstanding), label: 'Total Outstanding', labelNep: 'कुल बक्यौता' },
+   757→      totalCollected: { amount: Math.round(totalCollected), label: 'Total Collected', labelNep: 'कुल संकलन' },
+   758→      collectionRate: { value: collectionRate + '%', label: 'Collection Rate', labelNep: 'संकलन दर' },
+   759→      totalLoanAccounts: { value: disbursedLoans.length, label: 'Total Loan Accounts', labelNep: 'कुल ऋण खाता' },
+   760→      guaranteedLoans: { count: guaranteedLoans.length, amount: Math.round(totalGuaranteedAmount) },
+   761→    },
+   762→    byProduct: Object.entries(byProduct).map(([name, val]) => ({
+   763→      productName: name,
+   764→      count: val.count,
+   765→      disbursed: Math.round(val.disbursed),
+   766→      outstanding: Math.round(val.outstanding),
+   767→      interestRate: val.interestRate + '%',
+   768→    })),
+   769→    byPurpose: Object.entries(byPurpose).map(([purpose, val]) => ({
+   770→      purpose,
+   771→      count: val.count,
+   772→      amount: Math.round(val.amount),
+   773→    })),
+   774→    nplAnalysis: {
+   775→      classification: Object.entries(nplBreakdown).map(([key, val]) => ({
+   776→        classification: NRB_COMPLIANCE.NPL_CLASSIFICATION[key as keyof typeof NRB_COMPLIANCE.NPL_CLASSIFICATION].label,
+   777→        classificationNep: NRB_COMPLIANCE.NPL_CLASSIFICATION[key as keyof typeof NRB_COMPLIANCE.NPL_CLASSIFICATION].labelNep,
+   778→        count: val.count,
+   779→        amount: Math.round(val.amount),
+   780→        provisionRate: NRB_COMPLIANCE.NPL_CLASSIFICATION[key as keyof typeof NRB_COMPLIANCE.NPL_CLASSIFICATION].provision + '%',
+   781→        provisionAmount: Math.round(val.provision),
+   782→      })),
+   783→      totalNPL: Math.round(nplBreakdown.WATCH_LIST.amount + nplBreakdown.SUB_STANDARD.amount + nplBreakdown.DOUBTFUL.amount + nplBreakdown.LOSS.amount),
+   784→      totalProvisions: Math.round(Object.values(nplBreakdown).reduce((s, v) => s + v.provision, 0)),
+   785→    },
+   786→    topBorrowers: topBorrowers.map((b) => ({
+   787→      name: b.name,
+   788→      outstanding: Math.round(b.outstanding),
+   789→      loanCount: b.count,
+   790→    })),
+   791→    overdueLoans,
+   792→    currency: 'NPR',
+   793→    currencyNep: 'नेपाली रूपैयाँ',
+   794→  }
+   795→}
+   796→
+   797→// -----------------------------------------------------------
+   798→// 6. Savings Report (बचत विवरण)
+   799→// -----------------------------------------------------------
+   800→
+   801→function generateSavingsReport(data: Awaited<ReturnType<typeof fetchReportData>>) {
+   802→  const header = getInstitutionHeader(data.organization)
+   803→
+   804→  const totalBalance = data.savingsAccounts.reduce((s, a) => s + a.balance, 0)
+   805→  const totalInterestEarned = data.savingsAccounts.reduce((s, a) => s + a.interestEarned, 0)
+   806→
+   807→  // By product
+   808→  const byProduct = data.savingsAccounts.reduce((acc: Record<string, { count: number; balance: number; interest: number; rate: number }>, sa) => {
+   809→    const key = sa.product?.name || 'Unknown'
+   810→    if (!acc[key]) acc[key] = { count: 0, balance: 0, interest: 0, rate: sa.product?.interestRate || 0 }
+   811→    acc[key].count++
+   812→    acc[key].balance += sa.balance
+   813→    acc[key].interest += sa.interestEarned
+   814→    return acc
+   815→  }, {})
+   816→
+   817→  // By status
+   818→  const byStatus = data.savingsAccounts.reduce((acc: Record<string, { count: number; balance: number }>, sa) => {
+   819→    const key = sa.status
+   820→    if (!acc[key]) acc[key] = { count: 0, balance: 0 }
+   821→    acc[key].count++
+   822→    acc[key].balance += sa.balance
+   823→    return acc
+   824→  }, {})
+   825→
+   826→  // Recent transactions
+   827→  const recentTransactions = data.savingsTransactions.slice(0, 100).map((t) => ({
+   828→    accountNo: t.accountNo,
+   829→    type: t.type,
+   830→    amount: t.amount,
+   831→    balanceAfter: t.balanceAfter,
+   832→    description: t.description,
+   833→    transactionDate: t.transactionDate,
+   834→    referenceNo: t.referenceNo,
+   835→  }))
+   836→
+   837→  // Deposit vs withdrawal summary
+   838→  const totalDeposits = data.savingsTransactions.filter((t) => t.type === 'DEPOSIT').reduce((s, t) => s + t.amount, 0)
+   839→  const totalWithdrawals = data.savingsTransactions.filter((t) => t.type === 'WITHDRAWAL').reduce((s, t) => s + t.amount, 0)
+   840→  const totalInterestPaid = data.savingsTransactions.filter((t) => t.type === 'INTEREST').reduce((s, t) => s + t.amount, 0)
+   841→
+   842→  // Dormant accounts (no transactions in last 6 months)
+   843→  const dormantAccounts = data.savingsAccounts.filter((sa) => sa.status === 'DORMANT')
+   844→
+   845→  // Account growth
+   846→  const activeAccounts = data.savingsAccounts.filter((sa) => sa.status === 'ACTIVE').length
+   847→  const closedAccounts = data.savingsAccounts.filter((sa) => sa.status === 'CLOSED').length
+   848→  const frozenAccounts = data.savingsAccounts.filter((sa) => sa.status === 'FROZEN').length
+   849→
+   850→  return {
+   851→    reportType: 'savings-report',
+   852→    reportTitle: 'Savings Report',
+   853→    reportTitleNep: 'बचत विवरण',
+   854→    header,
+   855→    summary: {
+   856→      totalBalance: { amount: Math.round(totalBalance), label: 'Total Savings Balance', labelNep: 'कुल बचत शेष' },
+   857→      totalInterestEarned: { amount: Math.round(totalInterestEarned), label: 'Total Interest Earned', labelNep: 'कुल ब्याज आर्जित' },
+   858→      totalAccounts: { value: data.savingsAccounts.length, label: 'Total Savings Accounts', labelNep: 'कुल बचत खाता' },
+   859→      activeAccounts: { value: activeAccounts, label: 'Active Accounts', labelNep: 'सक्रिय खाता' },
+   860→      dormantAccounts: { value: dormantAccounts.length, label: 'Dormant Accounts', labelNep: 'निष्क्रिय खाता' },
+   861→      closedAccounts: { value: closedAccounts, label: 'Closed Accounts', labelNep: 'बन्द खाता' },
+   862→      frozenAccounts: { value: frozenAccounts, label: 'Frozen Accounts', labelNep: 'फ्रिज खाता' },
+   863→    },
+   864→    byProduct: Object.entries(byProduct).map(([name, val]) => ({
+   865→      productName: name,
+   866→      count: val.count,
+   867→      balance: Math.round(val.balance),
+   868→      interestEarned: Math.round(val.interest),
+   869→      interestRate: val.rate + '%',
+   870→    })),
+   871→    byStatus: Object.entries(byStatus).map(([status, val]) => ({
+   872→      status,
+   873→      count: val.count,
+   874→      balance: Math.round(val.balance),
+   875→    })),
+   876→    transactionSummary: {
+   877→      totalDeposits: { amount: Math.round(totalDeposits), label: 'Total Deposits', labelNep: 'कुल निक्षेप' },
+   878→      totalWithdrawals: { amount: Math.round(totalWithdrawals), label: 'Total Withdrawals', labelNep: 'कुल निकासा' },
+   879→      totalInterestPaid: { amount: Math.round(totalInterestPaid), label: 'Total Interest Paid', labelNep: 'कुल ब्याज भुक्तानी' },
+   880→      netDepositGrowth: { amount: Math.round(totalDeposits - totalWithdrawals), label: 'Net Deposit Growth', labelNep: 'खुद निक्षेप वृद्धि' },
+   881→    },
+   882→    recentTransactions,
+   883→    currency: 'NPR',
+   884→    currencyNep: 'नेपाली रूपैयाँ',
+   885→  }
+   886→}
+   887→
+   888→// -----------------------------------------------------------
+   889→// 7. Member Directory (सदस्य विवरण)
+   890→// -----------------------------------------------------------
+   891→
+   892→function generateMemberDirectory(data: Awaited<ReturnType<typeof fetchReportData>>) {
+   893→  const header = getInstitutionHeader(data.organization)
+   894→
+   895→  const memberDirectory = data.members.map((m) => {
+   896→    const memberSavings = data.savingsAccounts.filter((sa) => sa.memberId === m.id)
+   897→    const memberLoans = data.loanApplications.filter((la) => la.memberId === m.id && la.status === 'DISBURSED')
+   898→    const memberShares = data.shareHoldings.filter((sh) => sh.memberId === m.id)
+   899→
+   900→    return {
+   901→      memberNo: m.memberNo,
+   902→      name: `${m.firstName} ${m.lastName}`,
+   903→      nameNep: m.firstNameNep && m.lastNameNep ? `${m.firstNameNep} ${m.lastNameNep}` : '',
+   904→      phone: m.phone || '',
+   905→      email: m.email || '',
+   906→      gender: m.gender || '',
+   907→      occupation: m.occupation || '',
+   908→      citizenshipNo: m.citizenshipNo || '',
+   909→      permanentAddress: m.permanentAddr || '',
+   910→      district: m.district || '',
+   911→      province: m.province || '',
+   912→      membershipDate: m.membershipDate || '',
+   913→      status: m.status,
+   914→      memberType: m.memberType,
+   915→      nomineeName: m.nomineeName || '',
+   916→      nomineeRelation: m.nomineeRelation || '',
+   917→      savings: {
+   918→        totalBalance: memberSavings.reduce((s, a) => s + a.balance, 0),
+   919→        accountCount: memberSavings.length,
+   920→        accounts: memberSavings.map((sa) => ({
+   921→          accountNo: sa.accountNo,
+   922→          product: sa.product?.name || '',
+   923→          balance: sa.balance,
+   924→          status: sa.status,
+   925→        })),
+   926→      },
+   927→      loans: {
+   928→        totalOutstanding: memberLoans.reduce((s, l) => s + (l.outstandingAmount || 0), 0),
+   929→        loanCount: memberLoans.length,
+   930→        loans: memberLoans.map((l) => ({
+   931→          applicationNo: l.applicationNo,
+   932→          product: l.product?.name || '',
+   933→          disbursedAmount: l.disbursedAmount || 0,
+   934→          outstandingAmount: l.outstandingAmount || 0,
+   935→          interestRate: l.interestRate || 0,
+   936→          status: l.status,
+   937→        })),
+   938→      },
+   939→      shares: {
+   940→        totalShares: memberShares.reduce((s, sh) => s + sh.shareCount, 0),
+   941→        totalValue: memberShares.reduce((s, sh) => s + sh.shareValue, 0),
+   942→        holdings: memberShares.map((sh) => ({
+   943→          certificateNo: sh.certificateNo || '',
+   944→          shareCount: sh.shareCount,
+   945→          shareValue: sh.shareValue,
+   946→          purchaseDate: sh.purchaseDate,
+   947→          status: sh.status,
+   948→        })),
+   949→      },
+   950→    }
+   951→  })
+   952→
+   953→  // Summary statistics
+   954→  const totalMembers = data.members.length
+   955→  const activeMembers = data.members.filter((m) => m.status === 'ACTIVE').length
+   956→  const inactiveMembers = data.members.filter((m) => m.status === 'INACTIVE').length
+   957→  const resignedMembers = data.members.filter((m) => m.status === 'RESIGNED').length
+   958→  const suspendedMembers = data.members.filter((m) => m.status === 'SUSPENDED').length
+   959→  const deceasedMembers = data.members.filter((m) => m.status === 'DECEASED').length
+   960→
+   961→  const byGender = {
+   962→    male: data.members.filter((m) => m.gender === 'MALE').length,
+   963→    female: data.members.filter((m) => m.gender === 'FEMALE').length,
+   964→    other: data.members.filter((m) => m.gender === 'OTHER').length,
+   965→    unspecified: data.members.filter((m) => !m.gender).length,
+   966→  }
+   967→
+   968→  const byMemberType = data.members.reduce((acc: Record<string, number>, m) => {
+   969→    const type = m.memberType || 'UNSPECIFIED'
+   970→    acc[type] = (acc[type] || 0) + 1
+   971→    return acc
+   972→  }, {})
+   973→
+   974→  const byDistrict = data.members.reduce((acc: Record<string, number>, m) => {
+   975→    const district = m.district || 'Unknown'
+   976→    acc[district] = (acc[district] || 0) + 1
+   977→    return acc
+   978→  }, {})
+   979→
+   980→  return {
+   981→    reportType: 'member-directory',
+   982→    reportTitle: 'Member Directory',
+   983→    reportTitleNep: 'सदस्य विवरण',
+   984→    header,
+   985→    summary: {
+   986→      totalMembers,
+   987→      activeMembers,
+   988→      inactiveMembers,
+   989→      resignedMembers,
+   990→      suspendedMembers,
+   991→      deceasedMembers,
+   992→      byGender,
+   993→      byMemberType,
+   994→      byDistrict,
+   995→    },
+   996→    members: memberDirectory,
+   997→    currency: 'NPR',
+   998→    currencyNep: 'नेपाली रूपैयाँ',
+   999→  }
+  1000→}
+  1001→
+  1002→// -----------------------------------------------------------
+  1003→// 8. Cash Flow Statement (नगद प्रवाह विवरण)
+  1004→// -----------------------------------------------------------
+  1005→
+  1006→function generateCashFlow(data: Awaited<ReturnType<typeof fetchReportData>>) {
+  1007→  const header = getInstitutionHeader(data.organization)
+  1008→
+  1009→  const totalSavingsDeposits = data.savingsAccounts.reduce((s, a) => s + a.balance, 0)
+  1010→  const totalShareCapital = data.shareHoldings.reduce((s, sh) => s + sh.shareValue, 0)
+  1011→  const totalLoansDisbursed = data.loanApplications
+  1012→    .filter((l) => l.status === 'DISBURSED')
+  1013→    .reduce((s, l) => s + (l.disbursedAmount || 0), 0)
+  1014→  const totalOutstanding = data.loanApplications
+  1015→    .filter((l) => l.status === 'DISBURSED')
+  1016→    .reduce((s, l) => s + (l.outstandingAmount || 0), 0)
+  1017→
+  1018→  const interestIncome = data.loanApplications
+  1019→    .filter((l) => l.status === 'DISBURSED')
+  1020→    .reduce((s, l) => s + ((l.disbursedAmount || 0) * (l.interestRate || 0)) / 100 / 12, 0)
+  1021→  const interestExpense = data.savingsAccounts.reduce((s, a) => s + (a.balance * (a.product?.interestRate || 0)) / 100 / 12, 0)
+  1022→  const totalSalaryExpense = data.employees.reduce((s, e) => s + e.salary, 0)
+  1023→
+  1024→  // Inflows
+  1025→  const depositInflows = data.savingsTransactions.filter((t) => t.type === 'DEPOSIT').reduce((s, t) => s + t.amount, 0)
+  1026→  const loanRepaymentInflows = totalLoansDisbursed - totalOutstanding
+  1027→  const shareCapitalInflows = totalShareCapital
+  1028→  const feeIncome = data.loanApplications
+  1029→    .filter((l) => l.status !== 'PENDING')
+  1030→    .reduce((s, l) => s + (l.product?.processingFee || 0), 0)
+  1031→  const penaltyIncome = data.loanRepayments.reduce((s, r) => s + r.penaltyAmount, 0)
+  1032→  const totalInflows = depositInflows + loanRepaymentInflows + shareCapitalInflows + feeIncome + penaltyIncome
+  1033→
+  1034→  // Outflows
+  1035→  const loanDisbursementOutflows = totalLoansDisbursed
+  1036→  const withdrawalOutflows = data.savingsTransactions.filter((t) => t.type === 'WITHDRAWAL').reduce((s, t) => s + t.amount, 0)
+  1037→  const salaryOutflows = totalSalaryExpense
+  1038→  const interestPaymentOutflows = data.savingsTransactions.filter((t) => t.type === 'INTEREST').reduce((s, t) => s + t.amount, 0)
+  1039→  const assetPurchaseOutflows = data.assets.reduce((s, a) => s + a.purchasePrice, 0)
+  1040→  const totalOutflows = loanDisbursementOutflows + withdrawalOutflows + salaryOutflows + interestPaymentOutflows + assetPurchaseOutflows
+  1041→
+  1042→  // Net cash flow
+  1043→  const netCashFlow = totalInflows - totalOutflows
+  1044→
+  1045→  // Operating activities
+  1046→  const operatingInflows = {
+  1047→    interestReceived: { amount: Math.round(loanRepaymentInflows), label: 'Interest & Principal Received', labelNep: 'ब्याज तथा मूल रकम प्राप्त' },
+  1048→    feeIncome: { amount: Math.round(feeIncome), label: 'Fee Income', labelNep: 'शुल्क आय' },
+  1049→    penaltyIncome: { amount: Math.round(penaltyIncome), label: 'Penalty Income', labelNep: 'जरिवाना आय' },
+  1050→    totalOperatingInflows: { amount: Math.round(loanRepaymentInflows + feeIncome + penaltyIncome), label: 'Total Operating Inflows', labelNep: 'कुल सञ्चालन आगमन' },
+  1051→  }
+  1052→  const operatingOutflows = {
+  1053→    interestPaid: { amount: Math.round(interestPaymentOutflows), label: 'Interest Paid on Deposits', labelNep: 'निक्षेपमा ब्याज भुक्तानी' },
+  1054→    salaryPaid: { amount: Math.round(salaryOutflows), label: 'Salary & Benefits Paid', labelNep: 'तलब तथा भत्ता भुक्तानी' },
+  1055→    officeExpenses: { amount: 0, label: 'Office & Administrative Expenses', labelNep: 'कार्यालय तथा प्रशासनिक खर्च' },
+  1056→    totalOperatingOutflows: { amount: Math.round(interestPaymentOutflows + salaryOutflows), label: 'Total Operating Outflows', labelNep: 'कुल सञ्चालन जाने' },
+  1057→  }
+  1058→  const netOperatingCash = operatingInflows.totalOperatingInflows.amount - operatingOutflows.totalOperatingOutflows.amount
+  1059→
+  1060→  // Investing activities
+  1061→  const investingInflows = {
+  1062→    assetSale: { amount: 0, label: 'Proceeds from Asset Sale', labelNep: 'सम्पत्ति बिक्रीबाट प्राप्त' },
+  1063→    totalInvestingInflows: { amount: 0, label: 'Total Investing Inflows', labelNep: 'कुल लगानी आगमन' },
+  1064→  }
+  1065→  const investingOutflows = {
+  1066→    loanDisbursement: { amount: Math.round(loanDisbursementOutflows), label: 'Loan Disbursements', labelNep: 'ऋण वितरण' },
+  1067→    assetPurchase: { amount: Math.round(assetPurchaseOutflows), label: 'Asset Purchases', labelNep: 'सम्पत्ति खरिद' },
+  1068→    totalInvestingOutflows: { amount: Math.round(loanDisbursementOutflows + assetPurchaseOutflows), label: 'Total Investing Outflows', labelNep: 'कुल लगानी जाने' },
+  1069→  }
+  1070→  const netInvestingCash = investingInflows.totalInvestingInflows.amount - investingOutflows.totalInvestingOutflows.amount
+  1071→
+  1072→  // Financing activities
+  1073→  const financingInflows = {
+  1074→    memberDeposits: { amount: Math.round(depositInflows), label: 'Member Deposits Received', labelNep: 'सदस्य निक्षेप प्राप्त' },
+  1075→    shareCapital: { amount: Math.round(shareCapitalInflows), label: 'Share Capital Received', labelNep: 'शेयर पूँजी प्राप्त' },
+  1076→    totalFinancingInflows: { amount: Math.round(depositInflows + shareCapitalInflows), label: 'Total Financing Inflows', labelNep: 'कुल वित्तीय आगमन' },
+  1077→  }
+  1078→  const financingOutflows = {
+  1079→    depositWithdrawals: { amount: Math.round(withdrawalOutflows), label: 'Deposit Withdrawals', labelNep: 'निक्षेप निकासा' },
+  1080→    shareRedemptions: { amount: 0, label: 'Share Redemptions', labelNep: 'शेयर फिर्ता' },
+  1081→    totalFinancingOutflows: { amount: Math.round(withdrawalOutflows), label: 'Total Financing Outflows', labelNep: 'कुल वित्तीय जाने' },
+  1082→  }
+  1083→  const netFinancingCash = financingInflows.totalFinancingInflows.amount - financingOutflows.totalFinancingOutflows.amount
+  1084→
+  1085→  return {
+  1086→    reportType: 'cash-flow',
+  1087→    reportTitle: 'Cash Flow Statement',
+  1088→    reportTitleNep: 'नगद प्रवाह विवरण',
+  1089→    header,
+  1090→    operatingActivities: {
+  1091→      inflows: operatingInflows,
+  1092→      outflows: operatingOutflows,
+  1093→      netCashFromOperations: { amount: Math.round(netOperatingCash), label: 'Net Cash from Operations', labelNep: 'सञ्चालनबाट खुद नगद' },
+  1094→    },
+  1095→    investingActivities: {
+  1096→      inflows: investingInflows,
+  1097→      outflows: investingOutflows,
+  1098→      netCashFromInvesting: { amount: Math.round(netInvestingCash), label: 'Net Cash from Investing', labelNep: 'लगानीबाट खुद नगद' },
+  1099→    },
+  1100→    financingActivities: {
+  1101→      inflows: financingInflows,
+  1102→      outflows: financingOutflows,
+  1103→      netCashFromFinancing: { amount: Math.round(netFinancingCash), label: 'Net Cash from Financing', labelNep: 'वित्तीयबाट खुद नगद' },
+  1104→    },
+  1105→    summary: {
+  1106→      totalInflows: { amount: Math.round(totalInflows), label: 'Total Cash Inflows', labelNep: 'कुल नगद आगमन' },
+  1107→      totalOutflows: { amount: Math.round(totalOutflows), label: 'Total Cash Outflows', labelNep: 'कुल नगद जाने' },
+  1108→      netCashFlow: { amount: Math.round(netCashFlow), label: 'Net Cash Flow', labelNep: 'खुद नगद प्रवाह' },
+  1109→      cashAtBeginning: { amount: 0, label: 'Cash at Beginning of Period', labelNep: 'अवधि सुरुमा नगद' },
+  1110→      cashAtEnd: { amount: Math.round(netCashFlow), label: 'Cash at End of Period', labelNep: 'अवधि अन्त्यमा नगद' },
+  1111→    },
+  1112→    currency: 'NPR',
+  1113→    currencyNep: 'नेपाली रूपैयाँ',
+  1114→  }
+  1115→}
+  1116→
+  1117→// -----------------------------------------------------------
+  1118→// API Route Handler
+  1119→// -----------------------------------------------------------
+  1120→
+  1121→const VALID_REPORT_TYPES = [
+  1122→  'balance-sheet',
+  1123→  'income-statement',
+  1124→  'nrb-return',
+  1125→  'capital-adequacy',
+  1126→  'loan-portfolio',
+  1127→  'savings-report',
+  1128→  'member-directory',
+  1129→  'cash-flow',
+  1130→] as const
+  1131→
+  1132→type ReportType = (typeof VALID_REPORT_TYPES)[number]
+  1133→
+  1134→const REPORT_GENERATORS: Record<ReportType, (data: Awaited<ReturnType<typeof fetchReportData>>) => unknown> = {
+  1135→  'balance-sheet': generateBalanceSheet,
+  1136→  'income-statement': generateIncomeStatement,
+  1137→  'nrb-return': generateNRBReturn,
+  1138→  'capital-adequacy': generateCapitalAdequacy,
+  1139→  'loan-portfolio': generateLoanPortfolio,
+  1140→  'savings-report': generateSavingsReport,
+  1141→  'member-directory': generateMemberDirectory,
+  1142→  'cash-flow': generateCashFlow,
+  1143→}
+  1144→
+  1145→export async function GET(request: Request) {
+  1146→  try {
+  1147→    const { searchParams } = new URL(request.url)
+  1148→    const reportType = searchParams.get('type') as ReportType | null
+  1149→    const format = (searchParams.get('format') || 'json').toLowerCase()
+  1150→
+  1151→    // Validate report type
+  1152→    if (!reportType || !VALID_REPORT_TYPES.includes(reportType)) {
+  1153→      return NextResponse.json(
+  1154→        {
+  1155→          error: 'Invalid or missing report type',
+  1156→          validTypes: VALID_REPORT_TYPES,
+  1157→          usage: '/api/reports/nrb?type=<report-type>&format=<json|pdf>',
+  1158→        },
+  1159→        { status: 400 }
+  1160→      )
+  1161→    }
+  1162→
+  1163→    // Validate format
+  1164→    if (format !== 'json' && format !== 'pdf') {
+  1165→      return NextResponse.json(
+  1166→        {
+  1167→          error: 'Invalid format. Use "json" or "pdf"',
+  1168→        },
+  1169→        { status: 400 }
+  1170→      )
+  1171→    }
+  1172→
+  1173→    // Fetch all data
+  1174→    const data = await fetchReportData()
+  1175→
+  1176→    // Generate report
+  1177→    const generator = REPORT_GENERATORS[reportType]
+  1178→    const report = generator(data)
+  1179→
+  1180→    // Return based on format
+  1181→    if (format === 'pdf') {
+  1182→      // For PDF format, return the JSON data with a flag indicating PDF generation is needed
+  1183→      // In production, this would use a PDF generation library (e.g., puppeteer, jsPDF, or a service)
+  1184→      return NextResponse.json({
+  1185→        ...report,
+  1186→        _meta: {
+  1187→          format: 'pdf',
+  1188→          note: 'PDF generation requires server-side rendering. The JSON data below can be used for PDF template rendering. Implement PDF generation using a library like @react-pdf/renderer, puppeteer, or a dedicated PDF service.',
+  1189→          generatedAt: new Date().toISOString(),
+  1190→        },
+  1191→      })
+  1192→    }
+  1193→
+  1194→    // Default: return JSON
+  1195→    return NextResponse.json(report)
+  1196→  } catch (error) {
+  1197→    console.error('[NRB Report] Generation error:', error)
+  1198→    return NextResponse.json(
+  1199→      {
+  1200→        error: 'Failed to generate NRB report',
+  1201→        details: error instanceof Error ? error.message : 'Unknown error',
+  1202→      },
+  1203→      { status: 500 }
+  1204→    )
+  1205→  }
+  1206→}
+  1207→

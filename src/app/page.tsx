@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSession, signOut } from 'next-auth/react'
 import { useNavigationStore, type ModuleKey } from '@/store/navigation-store'
 import { formatBSDate, toNepaliDigits, getTodayBS, getBSMonthGrid, getBSMonthDays, bsMonths, bsMonthsNep, getBSYearRange, nprToWords } from '@/lib/bs-calendar'
+import { BSCalendarPicker } from '@/components/bs-calendar-picker'
 import {
   LayoutDashboard, Users, PiggyBank, HandCoins, BookOpen, UserCog,
   Package, Building2, Share2, CalendarDays, BarChart3, Settings,
@@ -236,7 +238,13 @@ function NotificationPanel({ open, onClose }: { open: boolean; onClose: () => vo
                     <p className="text-xs text-gray-600 mt-0.5">{n.message}</p>
                     <p className="text-xs text-gray-400 mt-0.5">{n.messageNep}</p>
                     {n.action === 'SEND_SMS' && (
-                      <Button size="sm" variant="outline" className="mt-2 h-7 text-xs" onClick={() => toast.success('SMS sent to member')}>
+                      <Button size="sm" variant="outline" className="mt-2 h-7 text-xs" onClick={async () => {
+                        try {
+                          const res = await fetch('/api/sms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'emi-reminder', loanId: n.id?.replace('emi-', '') }) })
+                          if (res.ok) toast.success('SMS sent to member')
+                          else toast.error('Failed to send SMS')
+                        } catch { toast.error('SMS service unavailable') }
+                      }}>
                         <Send className="w-3 h-3 mr-1" /> Send SMS
                       </Button>
                     )}
@@ -329,7 +337,7 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
 // MAIN APP
 // ============================================================
 export default function SahakariApp() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const { data: session, status } = useSession()
   const { activeModule, setActiveModule, sidebarOpen, setSidebarOpen } = useNavigationStore()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -345,9 +353,51 @@ export default function SahakariApp() {
       .catch(() => setLoading(false))
   }, [])
 
-  useEffect(() => { if (isLoggedIn) { fetch('/api/dashboard').then(r => r.json()).then(d => { setData(d); setLoading(false) }).catch(() => setLoading(false)) } }, [isLoggedIn])
+  useEffect(() => { if (status === 'authenticated') { loadData() } }, [status])
 
-  if (!isLoggedIn) return <LoginPage onLogin={() => setIsLoggedIn(true)} />
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 mx-auto text-emerald-600 animate-spin mb-4" />
+          <h2 className="text-xl font-bold text-gray-900">Loading Sahakari System...</h2>
+          <p className="text-gray-500 text-sm mt-1">सहकारी प्रणाली लोड हुँदैछ...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (status !== 'authenticated') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <Shield className="w-10 h-10 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900">सहकारी प्रणाली</h1>
+            <p className="text-emerald-600 mt-1">Sahakari System Management</p>
+            <p className="text-gray-500 text-sm mt-1">Nepal Cooperative Banking Software</p>
+          </div>
+          <Card className="border-0 shadow-xl">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Sign In</CardTitle>
+              <CardDescription>Enter your credentials to access the system</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-gray-500 text-center py-4">
+                <a href="/login" className="text-emerald-600 hover:underline font-medium">Click here to sign in</a>
+              </p>
+            </CardContent>
+          </Card>
+          <div className="text-center mt-6 text-xs text-gray-400">
+            <p>Demo: admin@janatasahakari.org.np / admin123</p>
+            <p className="mt-1">Sahakari System v2.0 | Cooperative Act 2047 Compliant</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (loading || !data) {
     return (
@@ -410,7 +460,7 @@ export default function SahakariApp() {
             {sidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             {sidebarOpen && <span>Collapse</span>}
           </button>
-          <button onClick={() => { setIsLoggedIn(false); toast.success('Logged out successfully') }} className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-sm transition-colors">
+          <button onClick={() => signOut({ callbackUrl: '/login' })} className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-sm transition-colors">
             <LogOut className="w-4 h-4" />
             {sidebarOpen && <span>Logout</span>}
           </button>
@@ -442,11 +492,11 @@ export default function SahakariApp() {
             </button>
             <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-gray-200">
               <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-                <span className="text-emerald-700 font-medium text-sm">RS</span>
+                <span className="text-emerald-700 font-medium text-sm">{session?.user?.name?.split(' ').map(n => n[0]).join('') || 'U'}</span>
               </div>
               <div className="hidden md:block">
-                <p className="text-sm font-medium text-gray-900">Ram B. Shrestha</p>
-                <p className="text-xs text-gray-500">Admin | {getTodayBS()}</p>
+                <p className="text-sm font-medium text-gray-900">{session?.user?.name || 'User'}</p>
+                <p className="text-xs text-gray-500">{(session?.user as any)?.role || 'Staff'} | {getTodayBS()}</p>
               </div>
             </div>
           </div>
@@ -1331,6 +1381,33 @@ function ReportsModule({ data }: { data: DashboardData }) {
     setLoading(false)
   }
 
+  const generateNRBReport = async (type: string) => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/reports/nrb?type=${type}`)
+      const d = await res.json()
+      setReportData({ ...d, reportType: 'nrb-detail', nrbType: type })
+      toast.success('NRB Report generated! / नरब प्रतिवेदन तयार भयो!')
+    } catch { toast.error('Failed to generate NRB report') }
+    setLoading(false)
+  }
+
+  const downloadReport = async (type: string) => {
+    try {
+      const res = await fetch(`/api/reports/nrb?type=${type}`)
+      const data = await res.json()
+      // Create a downloadable JSON file
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `NRB-${type}-${getTodayBS()}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Report downloaded! / प्रतिवेदन डाउनलोड भयो!')
+    } catch { toast.error('Download failed') }
+  }
+
   const reports = [
     { name: 'Balance Sheet', nameNep: 'तल्ला पत्र', icon: FileText, color: 'bg-emerald-100 text-emerald-600', type: 'balance' },
     { name: 'Income Statement', nameNep: 'आम्दानी खर्च', icon: TrendingUp, color: 'bg-blue-100 text-blue-600', type: 'income' },
@@ -1342,6 +1419,17 @@ function ReportsModule({ data }: { data: DashboardData }) {
     { name: 'Asset Register', nameNep: 'सम्पत्ति दर्ता', icon: Building2, color: 'bg-cyan-100 text-cyan-600', type: 'assets' },
     { name: 'HR Report', nameNep: 'मानव संसाधन', icon: UserCog, color: 'bg-orange-100 text-orange-600', type: 'hr' },
     { name: 'Audit Trail', nameNep: 'अडिट ट्रेल', icon: BookOpen, color: 'bg-slate-100 text-slate-600', type: 'audit' },
+  ]
+
+  const nrbReports = [
+    { name: 'Balance Sheet (NRB)', nameNep: 'निश्शेष जानकारी', icon: FileText, color: 'bg-red-100 text-red-600', type: 'balance-sheet' },
+    { name: 'Income Statement (NRB)', nameNep: 'आय-व्यय जानकारी', icon: TrendingUp, color: 'bg-red-100 text-red-600', type: 'income-statement' },
+    { name: 'NRB Quarterly Return', nameNep: 'नरब त्रैमासिक रिटर्न', icon: Shield, color: 'bg-red-100 text-red-600', type: 'nrb-return' },
+    { name: 'Capital Adequacy', nameNep: 'पूँजी पर्याप्तता', icon: Shield, color: 'bg-red-100 text-red-600', type: 'capital-adequacy' },
+    { name: 'Loan Portfolio (NRB)', nameNep: 'ऋण विवरण', icon: HandCoins, color: 'bg-red-100 text-red-600', type: 'loan-portfolio' },
+    { name: 'Savings Report (NRB)', nameNep: 'बचत विवरण', icon: PiggyBank, color: 'bg-red-100 text-red-600', type: 'savings-report' },
+    { name: 'Member Directory (NRB)', nameNep: 'सदस्य विवरण', icon: Users, color: 'bg-red-100 text-red-600', type: 'member-directory' },
+    { name: 'Cash Flow (NRB)', nameNep: 'नगद प्रवाह विवरण', icon: DollarSign, color: 'bg-red-100 text-red-600', type: 'cash-flow' },
   ]
 
   return (
@@ -1361,6 +1449,37 @@ function ReportsModule({ data }: { data: DashboardData }) {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* NRB Regulatory Reports Section */}
+      <div className="mt-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Shield className="w-5 h-5 text-red-600" />
+          <h3 className="text-lg font-bold text-gray-900">NRB Regulatory Reports / नेपाल राष्ट्र बैंक नियामक प्रतिवेदन</h3>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {nrbReports.map((r, i) => (
+            <Card key={i} className="border border-red-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer group" onClick={() => generateNRBReport(r.type)}>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`w-8 h-8 rounded-lg ${r.color} flex items-center justify-center`}><r.icon className="w-4 h-4" /></div>
+                  <div>
+                    <h3 className="font-medium text-gray-900 text-sm">{r.name}</h3>
+                    <p className="text-xs text-gray-400">{r.nameNep}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <Button variant="ghost" size="sm" className="text-xs h-7 flex-1" disabled={loading} onClick={(e) => { e.stopPropagation(); generateNRBReport(r.type) }}>
+                    <Eye className="w-3 h-3 mr-1" /> View
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-xs h-7 flex-1" onClick={(e) => { e.stopPropagation(); downloadReport(r.type) }}>
+                    <Download className="w-3 h-3 mr-1" /> Download
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
 
       {reportData && (

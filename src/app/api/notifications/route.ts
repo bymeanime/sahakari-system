@@ -45,12 +45,10 @@ export async function GET() {
       }
     })
 
-    // Overdue Loans
+    // Overdue Loans (Fix 7: check if nextDueDate is in the past instead of days since disbursement)
     loanApps.forEach(loan => {
-      if (loan.outstandingAmount && loan.outstandingAmount > 0) {
-        const daysSinceDisbursement = loan.disbursementDate ? 
-          Math.floor((Date.now() - new Date(loan.disbursementDate).getTime()) / (1000 * 60 * 60 * 24)) : 0
-        if (daysSinceDisbursement > 30) {
+      if (loan.outstandingAmount && loan.outstandingAmount > 0 && loan.nextDueDate) {
+        if (new Date(loan.nextDueDate) < new Date()) {
           notifications.push({
             id: `overdue-${loan.applicationNo}`,
             type: 'LOAN_OVERDUE',
@@ -58,7 +56,7 @@ export async function GET() {
             message: `${loan.member?.firstName} ${loan.member?.lastName} has an overdue amount of NPR ${loan.outstandingAmount.toLocaleString()}`,
             messageNep: `${loan.member?.firstName} ${loan.member?.lastName} को NPR ${loan.outstandingAmount.toLocaleString()} ऋण बक्यौता भएको`,
             severity: 'ERROR',
-            date: loan.disbursementDate || '',
+            date: loan.nextDueDate,
             memberName: `${loan.member?.firstName} ${loan.member?.lastName}`,
             action: 'SEND_SMS',
           })

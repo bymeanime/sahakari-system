@@ -41,6 +41,25 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
+
+    // KYC field validation (Fix 5)
+    const kycErrors: string[] = []
+    if (!body.citizenshipNo) {
+      kycErrors.push('Citizenship number is required / नागरिकता नम्बर आवश्यक छ')
+    }
+    if (!body.permanentAddr) {
+      kycErrors.push('Permanent address is required / स्थायी ठेगाना आवश्यक छ')
+    }
+    if (!body.dateOfBirth) {
+      kycErrors.push('Date of birth is required / जन्म मिति आवश्यक छ')
+    }
+    if (kycErrors.length > 0) {
+      return NextResponse.json(
+        { error: 'KYC validation failed / KYC प्रमाणीकरण असफल', details: kycErrors },
+        { status: 400 }
+      )
+    }
+
     const lastMember = await db.member.findFirst({ orderBy: { memberNo: 'desc' } })
     const nextNum = lastMember ? parseInt(lastMember.memberNo.replace('M-', '')) + 1 : 1
     const memberNo = `M-${String(nextNum).padStart(3, '0')}`
