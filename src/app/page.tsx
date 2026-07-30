@@ -14,7 +14,7 @@ import {
   Clock, AlertCircle, FileText, Download,
   Globe, Shield, LogOut, Send, Printer, ChevronDown,
   AlertTriangle, Info, CheckCircle, AlertCircleIcon, RefreshCw,
-  Trash2, Edit, Save, Loader2
+  Trash2, Edit, Save, Loader2, Minus, ChevronUp, Receipt, Banknote
 } from 'lucide-react'
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -271,7 +271,6 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
   const handleLogin = async () => {
     setLoading(true)
     setError('')
-    // Simulate authentication
     await new Promise(r => setTimeout(r, 800))
     if (email === 'admin@janatasahakari.org.np' && password === 'admin123') {
       onLogin()
@@ -292,7 +291,6 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
           <p className="text-emerald-600 mt-1">सहकारी व्यवस्थापन प्रणाली</p>
           <p className="text-gray-500 text-sm mt-1">Nepal Cooperative Banking Management</p>
         </div>
-
         <Card className="border-0 shadow-xl">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">Sign In</CardTitle>
@@ -323,7 +321,6 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
             </Button>
           </CardFooter>
         </Card>
-
         <div className="text-center mt-6 text-xs text-gray-400">
           <p>Demo: admin@janatasahakari.org.np / admin123</p>
           <p className="mt-1">Sahakari System v1.0 | Cooperative Act 2047 Compliant</p>
@@ -353,7 +350,14 @@ export default function SahakariApp() {
       .catch(() => setLoading(false))
   }, [])
 
-  useEffect(() => { if (status === 'authenticated') { loadData() } }, [status])
+  useEffect(() => {
+    if (status === 'authenticated') {
+      fetch('/api/dashboard')
+        .then(res => res.json())
+        .then(d => { setData(d); setLoading(false) })
+        .catch(() => setLoading(false))
+    }
+  }, [status])
 
   if (status === 'loading') {
     return (
@@ -431,7 +435,6 @@ export default function SahakariApp() {
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
-
         <ScrollArea className="flex-1 py-3">
           <nav className="space-y-1 px-2">
             {navItems.map(item => (
@@ -454,7 +457,6 @@ export default function SahakariApp() {
             ))}
           </nav>
         </ScrollArea>
-
         <div className="p-3 border-t border-gray-100 space-y-2">
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="w-full hidden lg:flex items-center justify-center gap-2 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-600 text-sm transition-colors">
             {sidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -466,14 +468,8 @@ export default function SahakariApp() {
           </button>
         </div>
       </aside>
-
-      {/* Mobile Overlay */}
       {mobileMenuOpen && <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setMobileMenuOpen(false)} />}
-
-      {/* Notification Panel */}
       <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
-
-      {/* Main Content */}
       <main className="flex-1 min-h-screen flex flex-col">
         <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-3 flex items-center gap-4 sticky top-0 z-20">
           <button className="lg:hidden" onClick={() => setMobileMenuOpen(true)}>
@@ -501,7 +497,6 @@ export default function SahakariApp() {
             </div>
           </div>
         </header>
-
         <div className="flex-1 p-4 lg:p-6 overflow-auto">
           {activeModule === 'dashboard' && <DashboardModule data={data} />}
           {activeModule === 'members' && <MembersModule data={data} onRefresh={loadData} />}
@@ -516,7 +511,6 @@ export default function SahakariApp() {
           {activeModule === 'reports' && <ReportsModule data={data} />}
           {activeModule === 'settings' && <SettingsModule data={data} />}
         </div>
-
         <footer className="bg-white border-t border-gray-200 px-4 py-3 text-center">
           <p className="text-xs text-gray-500">
             Sahakari System v1.0 | Janata Sahakari Sanstha Ltd. | जनता सहकारी संस्था लि. | FY {toNepaliDigits('2082/83')}
@@ -557,7 +551,6 @@ function DashboardModule({ data }: { data: DashboardData }) {
           </div>
         </div>
       </div>
-
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {kpiCards.map((kpi, i) => (
           <Card key={i} className="relative overflow-hidden border-0 shadow-sm hover:shadow-md transition-shadow">
@@ -580,7 +573,6 @@ function DashboardModule({ data }: { data: DashboardData }) {
           </Card>
         ))}
       </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 border-0 shadow-sm">
           <CardHeader className="pb-2">
@@ -612,7 +604,6 @@ function DashboardModule({ data }: { data: DashboardData }) {
             </ResponsiveContainer>
           </CardContent>
         </Card>
-
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Loan Status</CardTitle>
@@ -638,7 +629,6 @@ function DashboardModule({ data }: { data: DashboardData }) {
           </CardContent>
         </Card>
       </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-2">
@@ -657,7 +647,6 @@ function DashboardModule({ data }: { data: DashboardData }) {
             </ResponsiveContainer>
           </CardContent>
         </Card>
-
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Recent Activities</CardTitle>
@@ -684,7 +673,6 @@ function DashboardModule({ data }: { data: DashboardData }) {
           </CardContent>
         </Card>
       </div>
-
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {navItems.slice(1, 6).map(item => (
           <Card key={item.key} className="cursor-pointer hover:shadow-md transition-all border-0 shadow-sm group" onClick={() => useNavigationStore.getState().setActiveModule(item.key)}>
@@ -788,20 +776,17 @@ function MembersModule({ data, onRefresh }: { data: DashboardData; onRefresh: ()
           </DialogContent>
         </Dialog>
       </div>
-
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-blue-600">{data.members.length}</p><p className="text-xs text-gray-500">Total / कुल</p></CardContent></Card>
         <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-emerald-600">{data.members.filter(m=>m.status==='ACTIVE').length}</p><p className="text-xs text-gray-500">Active</p></CardContent></Card>
         <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-amber-600">{data.members.filter(m=>m.gender==='FEMALE').length}</p><p className="text-xs text-gray-500">Female / महिला</p></CardContent></Card>
         <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-purple-600">{data.members.filter(m=>m.gender==='MALE').length}</p><p className="text-xs text-gray-500">Male / पुरुष</p></CardContent></Card>
       </div>
-
       <div className="flex items-center gap-2 flex-wrap">
         {['ALL', 'ACTIVE', 'INACTIVE', 'SUSPENDED'].map(s => (
           <Button key={s} variant={filter === s ? 'default' : 'outline'} size="sm" onClick={() => setFilter(s)} className={filter === s ? 'bg-emerald-600 hover:bg-emerald-700' : ''}>{s}</Button>
         ))}
       </div>
-
       <Card className="border-0 shadow-sm">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -837,16 +822,38 @@ function MembersModule({ data, onRefresh }: { data: DashboardData; onRefresh: ()
 }
 
 // ============================================================
-// SAVINGS MODULE (with deposit/withdraw)
+// SAVINGS MODULE (Enhanced - with new account dialog & account detail)
 // ============================================================
 function SavingsModule({ data, onRefresh }: { data: DashboardData; onRefresh: () => void }) {
   const [actionOpen, setActionOpen] = useState(false)
+  const [newAccountOpen, setNewAccountOpen] = useState(false)
   const [actionType, setActionType] = useState<'deposit' | 'withdraw'>('deposit')
   const [selectedAccount, setSelectedAccount] = useState('')
   const [amount, setAmount] = useState('')
   const [saving, setSaving] = useState(false)
+  const [detailAccount, setDetailAccount] = useState<any>(null)
+  const [transactions, setTransactions] = useState<any[]>([])
+  const [products, setProducts] = useState<any[]>([])
+  const [newAcctForm, setNewAcctForm] = useState<Record<string, string>>({ openingDate: getTodayBS() })
 
   const totalBalance = data.savingsAccounts.reduce((s, a) => s + a.balance, 0)
+
+  // Fetch products for new account dialog
+  useEffect(() => {
+    fetch('/api/savings')
+      .then(r => r.json())
+      .then(d => { if (d.products) setProducts(d.products) })
+      .catch(() => {})
+  }, [])
+
+  // Fetch transaction history for detail view
+  const openDetail = (acct: any) => {
+    setDetailAccount(acct)
+    fetch(`/api/savings/${acct.id}`)
+      .then(r => r.json())
+      .then(d => { if (d.transactions) setTransactions(d.transactions) })
+      .catch(() => setTransactions([]))
+  }
 
   const handleAction = async () => {
     setSaving(true)
@@ -861,7 +868,33 @@ function SavingsModule({ data, onRefresh }: { data: DashboardData; onRefresh: ()
         setActionOpen(false)
         setAmount('')
         onRefresh()
-      } else { toast.error('Transaction failed') }
+      } else { const d = await res.json(); toast.error(d.error || 'Transaction failed') }
+    } catch { toast.error('Network error') }
+    setSaving(false)
+  }
+
+  const handleNewAccount = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/savings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create',
+          memberId: newAcctForm.memberId,
+          productId: newAcctForm.productId,
+          initialDeposit: parseFloat(newAcctForm.openingAmount || '0'),
+          openedDate: newAcctForm.openingDate || getTodayBS(),
+          nominiName: newAcctForm.nomineeName || undefined,
+          nominiRelation: newAcctForm.nomineeRelation || undefined,
+        }),
+      })
+      if (res.ok) {
+        toast.success('Savings account created! / बचत खाता खोलियो!')
+        setNewAccountOpen(false)
+        setNewAcctForm({ openingDate: getTodayBS() })
+        onRefresh()
+      } else { const d = await res.json(); toast.error(d.error || 'Failed to create account') }
     } catch { toast.error('Network error') }
     setSaving(false)
   }
@@ -870,7 +903,9 @@ function SavingsModule({ data, onRefresh }: { data: DashboardData; onRefresh: ()
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div><h2 className="text-2xl font-bold text-gray-900">Savings & Deposits</h2><p className="text-gray-500 text-sm">बचत तथा निक्षेप व्यवस्थापन</p></div>
-        <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => { setActionType('deposit'); setSelectedAccount(''); setActionOpen(true) }}><Plus className="w-4 h-4 mr-2" /> New Account</Button>
+        <div className="flex gap-2">
+          <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => { setNewAcctForm({ openingDate: getTodayBS() }); setNewAccountOpen(true) }}><Plus className="w-4 h-4 mr-2" /> New Account</Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -904,6 +939,7 @@ function SavingsModule({ data, onRefresh }: { data: DashboardData; onRefresh: ()
                     <TableCell><Badge className={statusColor(sa.status)}>{sa.status}</Badge></TableCell>
                     <TableCell>
                       <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" title="View Details" onClick={() => openDetail(sa)}><Eye className="w-4 h-4 text-blue-600" /></Button>
                         <Button variant="ghost" size="sm" title="Deposit" onClick={() => { setActionType('deposit'); setSelectedAccount(sa.accountNo); setActionOpen(true) }}><ArrowUpRight className="w-4 h-4 text-emerald-600" /></Button>
                         <Button variant="ghost" size="sm" title="Withdraw" onClick={() => { setActionType('withdraw'); setSelectedAccount(sa.accountNo); setActionOpen(true) }}><ArrowDownRight className="w-4 h-4 text-rose-600" /></Button>
                       </div>
@@ -916,6 +952,7 @@ function SavingsModule({ data, onRefresh }: { data: DashboardData; onRefresh: ()
         </CardContent>
       </Card>
 
+      {/* Deposit/Withdraw Dialog */}
       <Dialog open={actionOpen} onOpenChange={setActionOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -935,19 +972,122 @@ function SavingsModule({ data, onRefresh }: { data: DashboardData; onRefresh: ()
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* New Account Dialog */}
+      <Dialog open={newAccountOpen} onOpenChange={setNewAccountOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>New Savings Account / नयाँ बचत खाता</DialogTitle>
+            <DialogDescription>Open a new savings account for a member</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Member *</Label>
+              <Select value={newAcctForm.memberId || ''} onValueChange={v => setNewAcctForm({...newAcctForm, memberId: v})}>
+                <SelectTrigger><SelectValue placeholder="Select member" /></SelectTrigger>
+                <SelectContent>
+                  {data.members.map(m => <SelectItem key={m.id} value={m.id}>{m.memberNo} - {m.firstName} {m.lastName}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Savings Product *</Label>
+              <Select value={newAcctForm.productId || ''} onValueChange={v => setNewAcctForm({...newAcctForm, productId: v})}>
+                <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
+                <SelectContent>
+                  {products.map(p => <SelectItem key={p.id} value={p.id}>{p.name} ({p.interestRate}% p.a.)</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2"><Label>Opening Amount (NPR)</Label><Input type="number" placeholder="0" value={newAcctForm.openingAmount || ''} onChange={e => setNewAcctForm({...newAcctForm, openingAmount: e.target.value})} /></div>
+            <div className="space-y-2"><Label>Nominee Name</Label><Input placeholder="नाम" value={newAcctForm.nomineeName || ''} onChange={e => setNewAcctForm({...newAcctForm, nomineeName: e.target.value})} /></div>
+            <div className="space-y-2"><Label>Nominee Relation</Label><Input placeholder="नाता" value={newAcctForm.nomineeRelation || ''} onChange={e => setNewAcctForm({...newAcctForm, nomineeRelation: e.target.value})} /></div>
+            <div className="sm:col-span-2"><BSDatePicker label="Opening Date (BS)" value={newAcctForm.openingDate || getTodayBS()} onChange={v => setNewAcctForm({...newAcctForm, openingDate: v})} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewAccountOpen(false)}>Cancel</Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleNewAccount} disabled={saving || !newAcctForm.memberId || !newAcctForm.productId}>
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Create Account
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Account Detail Dialog */}
+      <Dialog open={!!detailAccount} onOpenChange={() => setDetailAccount(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Account Details / खाता विवरण</DialogTitle>
+            <DialogDescription>{detailAccount?.accountNo} - {detailAccount?.member ? `${detailAccount.member.firstName} ${detailAccount.member.lastName}` : ''}</DialogDescription>
+          </DialogHeader>
+          {detailAccount && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="p-3 bg-emerald-50 rounded-lg text-center"><p className="text-lg font-bold text-emerald-700">{formatNPR(detailAccount.balance)}</p><p className="text-xs text-emerald-600">Balance</p></div>
+                <div className="p-3 bg-blue-50 rounded-lg text-center"><p className="text-lg font-bold text-blue-700">{formatNPR(detailAccount.interestEarned)}</p><p className="text-xs text-blue-600">Interest</p></div>
+                <div className="p-3 bg-amber-50 rounded-lg text-center"><p className="text-lg font-bold text-amber-700">{detailAccount.product?.name || '—'}</p><p className="text-xs text-amber-600">Product</p></div>
+                <div className="p-3 bg-gray-50 rounded-lg text-center"><p className="text-lg font-bold text-gray-700">{detailAccount.status}</p><p className="text-xs text-gray-600">Status</p></div>
+              </div>
+              {detailAccount.nominiName && (
+                <div className="p-3 bg-gray-50 rounded-lg"><p className="text-sm text-gray-500">Nominee: <span className="font-medium text-gray-900">{detailAccount.nominiName}</span> ({detailAccount.nominiRelation || 'N/A'})</p></div>
+              )}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-2">Transaction History / कारोबार विवरण</h4>
+                {transactions.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400"><FileText className="w-8 h-8 mx-auto mb-2 opacity-50" /><p className="text-sm">No transactions yet</p></div>
+                ) : (
+                  <Card className="border shadow-none"><CardContent className="p-0"><div className="overflow-x-auto">
+                    <Table><TableHeader><TableRow className="bg-gray-50">
+                      <TableHead className="font-semibold">Date</TableHead>
+                      <TableHead className="font-semibold">Type</TableHead>
+                      <TableHead className="font-semibold">Amount</TableHead>
+                      <TableHead className="font-semibold">Balance</TableHead>
+                      <TableHead className="font-semibold hidden sm:table-cell">Description</TableHead>
+                    </TableRow></TableHeader><TableBody>
+                      {transactions.map((tx: any) => (
+                        <TableRow key={tx.id} className="hover:bg-gray-50">
+                          <TableCell className="text-sm">{tx.transactionDate}</TableCell>
+                          <TableCell><Badge className={tx.type === 'DEPOSIT' ? 'bg-emerald-100 text-emerald-800' : tx.type === 'WITHDRAWAL' ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800'}>{tx.type}</Badge></TableCell>
+                          <TableCell className={`font-medium ${tx.type === 'DEPOSIT' ? 'text-emerald-600' : 'text-rose-600'}`}>{formatNPR(tx.amount)}</TableCell>
+                          <TableCell className="font-medium">{formatNPR(tx.balanceAfter)}</TableCell>
+                          <TableCell className="hidden sm:table-cell text-sm text-gray-500">{tx.description || '—'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody></Table>
+                  </div></CardContent></Card>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
 
 // ============================================================
-// LOANS MODULE (with approve/disburse)
+// LOANS MODULE (Enhanced - with new application dialog & EMI schedule)
 // ============================================================
 function LoansModule({ data, onRefresh }: { data: DashboardData; onRefresh: () => void }) {
   const [tab, setTab] = useState('all')
   const [actionOpen, setActionOpen] = useState(false)
+  const [newAppOpen, setNewAppOpen] = useState(false)
   const [actionType, setActionType] = useState<'approve' | 'disburse' | 'reject'>('approve')
   const [selectedLoan, setSelectedLoan] = useState('')
   const [actionForm, setActionForm] = useState<Record<string, string>>({})
+  const [newAppForm, setNewAppForm] = useState<Record<string, string>>({ applicationDate: getTodayBS() })
+  const [loanProducts, setLoanProducts] = useState<any[]>([])
+  const [saving, setSaving] = useState(false)
+  const [emiSchedule, setEmiSchedule] = useState<any[]>([])
+  const [emiLoanId, setEmiLoanId] = useState<string | null>(null)
+
+  // Fetch loan products
+  useEffect(() => {
+    fetch('/api/loans')
+      .then(r => r.json())
+      .then(d => { if (d.products) setLoanProducts(d.products) })
+      .catch(() => {})
+  }, [])
 
   const filtered = data.loanApps.filter(l => {
     if (tab === 'all') return true
@@ -958,6 +1098,7 @@ function LoansModule({ data, onRefresh }: { data: DashboardData; onRefresh: () =
   })
 
   const handleAction = async () => {
+    setSaving(true)
     try {
       const body: any = { action: actionType, applicationNo: selectedLoan }
       if (actionType === 'approve') {
@@ -977,13 +1118,60 @@ function LoansModule({ data, onRefresh }: { data: DashboardData; onRefresh: () =
         onRefresh()
       } else { toast.error('Action failed') }
     } catch { toast.error('Network error') }
+    setSaving(false)
+  }
+
+  const handleNewApplication = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/loans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          memberId: newAppForm.memberId,
+          productId: newAppForm.productId,
+          requestedAmount: newAppForm.requestedAmount,
+          term: newAppForm.term,
+          purpose: newAppForm.purpose,
+          purposeNepali: newAppForm.purposeNepali,
+          collateralType: newAppForm.collateralType,
+          collateralValue: newAppForm.collateralValue,
+          collateralDesc: newAppForm.collateralDesc,
+          guarantorId: newAppForm.guarantorId || undefined,
+        }),
+      })
+      if (res.ok) {
+        toast.success('Loan application submitted! / ऋण आवेदन दाखिल भयो!')
+        setNewAppOpen(false)
+        setNewAppForm({ applicationDate: getTodayBS() })
+        onRefresh()
+      } else { toast.error('Failed to submit application') }
+    } catch { toast.error('Network error') }
+    setSaving(false)
+  }
+
+  const showEmiSchedule = (loan: any) => {
+    const P = loan.disbursedAmount || loan.approvedAmount || loan.requestedAmount
+    const r = (loan.interestRate || 12) / 100 / 12
+    const n = loan.term || 12
+    const emi = P * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1)
+    const schedule = []
+    let balance = P
+    for (let i = 1; i <= n; i++) {
+      const interest = balance * r
+      const principal = emi - interest
+      balance -= principal
+      schedule.push({ month: i, emi: Math.round(emi), principal: Math.round(principal), interest: Math.round(interest), balance: Math.round(Math.max(0, balance)) })
+    }
+    setEmiSchedule(schedule)
+    setEmiLoanId(loan.id)
   }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div><h2 className="text-2xl font-bold text-gray-900">Loan Management</h2><p className="text-gray-500 text-sm">ऋण व्यवस्थापन</p></div>
-        <Button className="bg-emerald-600 hover:bg-emerald-700"><Plus className="w-4 h-4 mr-2" /> New Application</Button>
+        <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => { setNewAppForm({ applicationDate: getTodayBS() }); setNewAppOpen(true) }}><Plus className="w-4 h-4 mr-2" /> New Application</Button>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -1032,6 +1220,9 @@ function LoansModule({ data, onRefresh }: { data: DashboardData; onRefresh: () =
                         {la.status === 'APPROVED' && (
                           <Button variant="ghost" size="sm" className="text-blue-600" onClick={() => { setActionType('disburse'); setSelectedLoan(la.applicationNo); setActionForm({disbursedAmount: String(la.approvedAmount || la.requestedAmount)}); setActionOpen(true) }}><DollarSign className="w-4 h-4" /></Button>
                         )}
+                        {(la.status === 'DISBURSED' || la.status === 'APPROVED') && (
+                          <Button variant="ghost" size="sm" className="text-purple-600" title="EMI Schedule" onClick={() => showEmiSchedule(la)}><Receipt className="w-4 h-4" /></Button>
+                        )}
                         <Button variant="ghost" size="sm"><Eye className="w-4 h-4" /></Button>
                       </div>
                     </TableCell>
@@ -1043,6 +1234,7 @@ function LoansModule({ data, onRefresh }: { data: DashboardData; onRefresh: () =
         </CardContent>
       </Card>
 
+      {/* Action Dialog (approve/disburse/reject) */}
       <Dialog open={actionOpen} onOpenChange={setActionOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -1068,10 +1260,107 @@ function LoansModule({ data, onRefresh }: { data: DashboardData; onRefresh: () =
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setActionOpen(false)}>Cancel</Button>
-            <Button className={actionType === 'reject' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'} onClick={handleAction}>
+            <Button className={actionType === 'reject' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'} onClick={handleAction} disabled={saving}>
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {actionType === 'approve' ? 'Approve' : actionType === 'disburse' ? 'Disburse' : 'Reject'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Application Dialog */}
+      <Dialog open={newAppOpen} onOpenChange={setNewAppOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>New Loan Application / नयाँ ऋण आवेदन</DialogTitle>
+            <DialogDescription>Submit a new loan application</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Member *</Label>
+              <Select value={newAppForm.memberId || ''} onValueChange={v => setNewAppForm({...newAppForm, memberId: v})}>
+                <SelectTrigger><SelectValue placeholder="Select member" /></SelectTrigger>
+                <SelectContent>
+                  {data.members.map(m => <SelectItem key={m.id} value={m.id}>{m.memberNo} - {m.firstName} {m.lastName}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Loan Product *</Label>
+              <Select value={newAppForm.productId || ''} onValueChange={v => setNewAppForm({...newAppForm, productId: v})}>
+                <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
+                <SelectContent>
+                  {loanProducts.map(p => <SelectItem key={p.id} value={p.id}>{p.name} ({p.interestRate}% p.a.)</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2"><Label>Requested Amount (NPR) *</Label><Input type="number" value={newAppForm.requestedAmount || ''} onChange={e => setNewAppForm({...newAppForm, requestedAmount: e.target.value})} /></div>
+            <div className="space-y-2"><Label>Term (months) *</Label><Input type="number" value={newAppForm.term || ''} onChange={e => setNewAppForm({...newAppForm, term: e.target.value})} /></div>
+            <div className="space-y-2"><Label>Purpose</Label><Input placeholder="Purpose of loan" value={newAppForm.purpose || ''} onChange={e => setNewAppForm({...newAppForm, purpose: e.target.value})} /></div>
+            <div className="space-y-2"><Label>ऋणको उद्देश्य</Label><Input placeholder="नेपालीमा" value={newAppForm.purposeNepali || ''} onChange={e => setNewAppForm({...newAppForm, purposeNepali: e.target.value})} /></div>
+            <div className="space-y-2">
+              <Label>Guarantor</Label>
+              <Select value={newAppForm.guarantorId || ''} onValueChange={v => setNewAppForm({...newAppForm, guarantorId: v})}>
+                <SelectTrigger><SelectValue placeholder="Select guarantor" /></SelectTrigger>
+                <SelectContent>
+                  {data.members.filter(m => m.id !== newAppForm.memberId).map(m => <SelectItem key={m.id} value={m.id}>{m.memberNo} - {m.firstName} {m.lastName}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2"><Label>Collateral Type</Label>
+              <Select value={newAppForm.collateralType || ''} onValueChange={v => setNewAppForm({...newAppForm, collateralType: v})}>
+                <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                <SelectContent>
+                  {['LAND', 'BUILDING', 'GOLD', 'VEHICLE', 'FIXED_DEPOSIT', 'SHARE_CERTIFICATE', 'PERSONAL_GUARANTEE'].map(t => <SelectItem key={t} value={t}>{t.replace(/_/g, ' ')}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2"><Label>Collateral Value (NPR)</Label><Input type="number" value={newAppForm.collateralValue || ''} onChange={e => setNewAppForm({...newAppForm, collateralValue: e.target.value})} /></div>
+            <div className="space-y-2"><Label>Collateral Description</Label><Input placeholder="Details" value={newAppForm.collateralDesc || ''} onChange={e => setNewAppForm({...newAppForm, collateralDesc: e.target.value})} /></div>
+            <div className="sm:col-span-2"><BSDatePicker label="Application Date (BS)" value={newAppForm.applicationDate || getTodayBS()} onChange={v => setNewAppForm({...newAppForm, applicationDate: v})} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewAppOpen(false)}>Cancel</Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleNewApplication} disabled={saving || !newAppForm.memberId || !newAppForm.productId || !newAppForm.requestedAmount || !newAppForm.term}>
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Submit Application
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* EMI Schedule Dialog */}
+      <Dialog open={!!emiLoanId} onOpenChange={() => setEmiLoanId(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>EMI Schedule / किस्ता तालिका</DialogTitle>
+            <DialogDescription>Estimated EMI repayment schedule</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {emiSchedule.length > 0 && (
+              <div className="p-3 bg-emerald-50 rounded-lg">
+                <p className="text-sm text-emerald-700">Monthly EMI: <span className="font-bold">{formatNPR(emiSchedule[0].emi)}</span></p>
+              </div>
+            )}
+            <Card className="border shadow-none"><CardContent className="p-0"><div className="overflow-x-auto max-h-96 overflow-y-auto">
+              <Table><TableHeader><TableRow className="bg-gray-50">
+                <TableHead className="font-semibold">Month</TableHead>
+                <TableHead className="font-semibold">EMI</TableHead>
+                <TableHead className="font-semibold">Principal</TableHead>
+                <TableHead className="font-semibold">Interest</TableHead>
+                <TableHead className="font-semibold">Balance</TableHead>
+              </TableRow></TableHeader><TableBody>
+                {emiSchedule.map((row: any) => (
+                  <TableRow key={row.month} className="hover:bg-gray-50">
+                    <TableCell className="font-medium">{row.month}</TableCell>
+                    <TableCell>{formatNPR(row.emi)}</TableCell>
+                    <TableCell>{formatNPR(row.principal)}</TableCell>
+                    <TableCell>{formatNPR(row.interest)}</TableCell>
+                    <TableCell>{formatNPR(row.balance)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody></Table>
+            </div></CardContent></Card>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
@@ -1079,61 +1368,639 @@ function LoansModule({ data, onRefresh }: { data: DashboardData; onRefresh: () =
 }
 
 // ============================================================
-// ACCOUNTING MODULE
+// ACCOUNTING MODULE (COMPLETE OVERHAUL)
 // ============================================================
 function AccountingModule({ data, onRefresh }: { data: DashboardData; onRefresh: () => void }) {
   const [tab, setTab] = useState('journal')
+  const [newEntryOpen, setNewEntryOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  // Journal entry form state
+  const [entryForm, setEntryForm] = useState({
+    entryType: 'JOURNAL',
+    date: getTodayBS(),
+    narration: '',
+    narrationNep: '',
+    items: [
+      { accountId: '', debit: 0, credit: 0, description: '' },
+      { accountId: '', debit: 0, credit: 0, description: '' },
+    ],
+  })
+
+  // Ledger state
+  const [ledgerAccountId, setLedgerAccountId] = useState('')
+  const [ledgerFromDate, setLedgerFromDate] = useState('')
+  const [ledgerToDate, setLedgerToDate] = useState('')
+  const [ledgerData, setLedgerData] = useState<any>(null)
+  const [ledgerLoading, setLedgerLoading] = useState(false)
+
+  // Trial Balance state
+  const [trialBalanceData, setTrialBalanceData] = useState<any>(null)
+  const [trialBalanceLoading, setTrialBalanceLoading] = useState(false)
+
+  // Day Book state
+  const [dayBookDate, setDayBookDate] = useState(getTodayBS())
+  const [dayBookData, setDayBookData] = useState<any>(null)
+  const [dayBookLoading, setDayBookLoading] = useState(false)
+  const [expandedRow, setExpandedRow] = useState<string | null>(null)
+
+  // Voucher quick-create state
+  const [voucherType, setVoucherType] = useState<string>('PAYMENT')
+
+  const accounts = data.accounts || []
+  const nonHeaderAccounts = accounts.filter((a: any) => a.subType !== 'HEADER')
+
+  const totalDebit = entryForm.items.reduce((s, i) => s + (i.debit || 0), 0)
+  const totalCredit = entryForm.items.reduce((s, i) => s + (i.credit || 0), 0)
+  const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01
+
+  // Reset form and open dialog
+  const openNewEntry = (preType?: string) => {
+    setEntryForm({
+      entryType: preType || 'JOURNAL',
+      date: getTodayBS(),
+      narration: '',
+      narrationNep: '',
+      items: [
+        { accountId: '', debit: 0, credit: 0, description: '' },
+        { accountId: '', debit: 0, credit: 0, description: '' },
+      ],
+    })
+    setNewEntryOpen(true)
+  }
+
+  // Open voucher quick-create with pre-populated accounts
+  const openVoucherCreate = (type: string) => {
+    const cashAccounts = nonHeaderAccounts.filter((a: any) => a.subType === 'CASH' || a.name.toLowerCase().includes('cash'))
+    const bankAccounts = nonHeaderAccounts.filter((a: any) => a.subType === 'BANK' || a.name.toLowerCase().includes('bank'))
+    const cashOrBankId = (cashAccounts[0] || bankAccounts[0])?.id || ''
+
+    let items = [
+      { accountId: '', debit: 0, credit: 0, description: '' },
+      { accountId: '', debit: 0, credit: 0, description: '' },
+    ]
+
+    if (type === 'PAYMENT') {
+      // Payment: Debit = expense/asset, Credit = Cash/Bank
+      items = [
+        { accountId: '', debit: 0, credit: 0, description: '' },
+        { accountId: cashOrBankId, debit: 0, credit: 0, description: '' },
+      ]
+    } else if (type === 'RECEIPT') {
+      // Receipt: Debit = Cash/Bank, Credit = income/liability
+      items = [
+        { accountId: cashOrBankId, debit: 0, credit: 0, description: '' },
+        { accountId: '', debit: 0, credit: 0, description: '' },
+      ]
+    } else if (type === 'CONTRA') {
+      // Contra: Both accounts = Cash/Bank
+      const bankId = bankAccounts[0]?.id || cashOrBankId
+      items = [
+        { accountId: cashOrBankId, debit: 0, credit: 0, description: '' },
+        { accountId: bankId, debit: 0, credit: 0, description: '' },
+      ]
+    }
+
+    setEntryForm({
+      entryType: type,
+      date: getTodayBS(),
+      narration: '',
+      narrationNep: '',
+      items,
+    })
+    setVoucherType(type)
+    setNewEntryOpen(true)
+  }
+
+  const addItem = () => {
+    setEntryForm({...entryForm, items: [...entryForm.items, { accountId: '', debit: 0, credit: 0, description: '' }]})
+  }
+
+  const removeItem = (idx: number) => {
+    if (entryForm.items.length <= 2) return
+    const newItems = entryForm.items.filter((_, i) => i !== idx)
+    setEntryForm({...entryForm, items: newItems})
+  }
+
+  const updateItem = (idx: number, field: string, value: any) => {
+    const newItems = [...entryForm.items]
+    newItems[idx] = { ...newItems[idx], [field]: value }
+    setEntryForm({...entryForm, items: newItems})
+  }
+
+  const handleSubmitEntry = async () => {
+    if (!isBalanced) {
+      toast.error('Total debits must equal total credits / कुल डेबिट कुल क्रेडिट सँग बराबर हुनुपर्छ')
+      return
+    }
+    if (entryForm.items.some(i => !i.accountId)) {
+      toast.error('All line items must have an account selected / सबै लाइन आइटममा खाता छान्नुहोस्')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/accounting', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: entryForm.date,
+          narration: entryForm.narration,
+          narrationNep: entryForm.narrationNep || undefined,
+          entryType: entryForm.entryType,
+          items: entryForm.items.map(i => ({
+            accountId: i.accountId,
+            debit: i.debit || 0,
+            credit: i.credit || 0,
+            description: i.description || undefined,
+          })),
+        }),
+      })
+      if (res.ok) {
+        toast.success('Journal entry created! / जर्नल प्रविष्टि सिर्जना भयो!')
+        setNewEntryOpen(false)
+        onRefresh()
+      } else {
+        const d = await res.json()
+        toast.error(d.error || 'Failed to create entry')
+      }
+    } catch { toast.error('Network error') }
+    setSaving(false)
+  }
+
+  // Post/Cancel entry
+  const handleEntryAction = async (entryId: string, action: 'POSTED' | 'CANCELLED') => {
+    try {
+      const res = await fetch(`/api/journal-entries/${entryId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: action, postedBy: 'ADMIN' }),
+      })
+      if (res.ok) {
+        toast.success(`Entry ${action === 'POSTED' ? 'posted' : 'cancelled'}! / प्रविष्टि ${action === 'POSTED' ? 'पोस्ट' : 'रद्द'} भयो!`)
+        onRefresh()
+      } else { toast.error('Action failed') }
+    } catch { toast.error('Network error') }
+  }
+
+  // Fetch Ledger
+  const fetchLedger = async () => {
+    if (!ledgerAccountId) { toast.error('Please select an account'); return }
+    setLedgerLoading(true)
+    try {
+      const params = new URLSearchParams({ type: 'ledger', accountId: ledgerAccountId })
+      if (ledgerFromDate) params.set('fromDate', ledgerFromDate)
+      if (ledgerToDate) params.set('toDate', ledgerToDate)
+      const res = await fetch(`/api/accounting/reports?${params}`)
+      const d = await res.json()
+      setLedgerData(d)
+      toast.success('Ledger loaded! / खाता विवरण लोड भयो!')
+    } catch { toast.error('Failed to load ledger') }
+    setLedgerLoading(false)
+  }
+
+  // Fetch Trial Balance
+  const fetchTrialBalance = async () => {
+    setTrialBalanceLoading(true)
+    try {
+      const res = await fetch('/api/accounting/reports?type=trial-balance')
+      const d = await res.json()
+      setTrialBalanceData(d)
+      toast.success('Trial Balance generated! / तल्ला परीक्षण तयार भयो!')
+    } catch { toast.error('Failed to generate trial balance') }
+    setTrialBalanceLoading(false)
+  }
+
+  // Fetch Day Book
+  const fetchDayBook = async () => {
+    setDayBookLoading(true)
+    try {
+      const res = await fetch(`/api/accounting/reports?type=day-book&date=${dayBookDate}`)
+      const d = await res.json()
+      setDayBookData(d)
+      toast.success('Day Book loaded! / दैनिक पुस्तक लोड भयो!')
+    } catch { toast.error('Failed to load day book') }
+    setDayBookLoading(false)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div><h2 className="text-2xl font-bold text-gray-900">Accounting</h2><p className="text-gray-500 text-sm">लेखा व्यवस्थापन - Double Entry System</p></div>
-        <Button className="bg-emerald-600 hover:bg-emerald-700"><Plus className="w-4 h-4 mr-2" /> New Entry</Button>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Accounting</h2>
+          <p className="text-gray-500 text-sm">लेखा व्यवस्थापन - Double Entry System</p>
+        </div>
+        <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => openNewEntry()}>
+          <Plus className="w-4 h-4 mr-2" /> New Entry
+        </Button>
       </div>
+
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList><TabsTrigger value="journal">Journal Entries</TabsTrigger><TabsTrigger value="chart">Chart of Accounts</TabsTrigger><TabsTrigger value="ledger">Ledger</TabsTrigger></TabsList>
-        <TabsContent value="journal" className="mt-4">
-          <Card className="border-0 shadow-sm"><CardContent className="p-0"><div className="overflow-x-auto">
-            <Table><TableHeader><TableRow className="bg-gray-50">
-              <TableHead className="font-semibold">Voucher</TableHead><TableHead className="font-semibold">Date</TableHead>
-              <TableHead className="font-semibold">Narration</TableHead><TableHead className="font-semibold">Type</TableHead>
-              <TableHead className="font-semibold">Debit</TableHead><TableHead className="font-semibold">Credit</TableHead><TableHead className="font-semibold">Status</TableHead>
-            </TableRow></TableHeader><TableBody>
-              {data.journalEntries.map(je => (
-                <TableRow key={je.id} className="hover:bg-gray-50">
-                  <TableCell className="font-medium text-purple-600">{je.voucherNo}</TableCell>
-                  <TableCell>{je.date}</TableCell>
-                  <TableCell className="max-w-xs truncate">{je.narration}</TableCell>
-                  <TableCell><Badge variant="outline">{je.entryType}</Badge></TableCell>
-                  <TableCell className="text-emerald-600">{formatNPR(je.items.reduce((s:any,i:any)=>s+i.debit,0))}</TableCell>
-                  <TableCell className="text-rose-600">{formatNPR(je.items.reduce((s:any,i:any)=>s+i.credit,0))}</TableCell>
-                  <TableCell><Badge className={statusColor(je.status)}>{je.status}</Badge></TableCell>
-                </TableRow>
-              ))}
-            </TableBody></Table>
-          </div></CardContent></Card>
+        <TabsList className="flex-wrap">
+          <TabsTrigger value="journal">Journal Entries</TabsTrigger>
+          <TabsTrigger value="vouchers">Vouchers</TabsTrigger>
+          <TabsTrigger value="ledger">Ledger</TabsTrigger>
+          <TabsTrigger value="trial-balance">Trial Balance</TabsTrigger>
+          <TabsTrigger value="day-book">Day Book</TabsTrigger>
+        </TabsList>
+
+        {/* ===== JOURNAL ENTRIES TAB ===== */}
+        <TabsContent value="journal" className="mt-4 space-y-4">
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader><TableRow className="bg-gray-50">
+                    <TableHead className="font-semibold">Voucher</TableHead>
+                    <TableHead className="font-semibold">Date</TableHead>
+                    <TableHead className="font-semibold">Narration</TableHead>
+                    <TableHead className="font-semibold">Type</TableHead>
+                    <TableHead className="font-semibold">Debit</TableHead>
+                    <TableHead className="font-semibold">Credit</TableHead>
+                    <TableHead className="font-semibold">Status</TableHead>
+                    <TableHead className="font-semibold">Actions</TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>
+                    {data.journalEntries.map((je: any) => (
+                      <TableRow key={je.id} className="hover:bg-gray-50">
+                        <TableCell className="font-medium text-purple-600">{je.voucherNo}</TableCell>
+                        <TableCell className="text-sm">{je.date}</TableCell>
+                        <TableCell className="max-w-xs truncate">{je.narration}</TableCell>
+                        <TableCell><Badge variant="outline">{je.entryType}</Badge></TableCell>
+                        <TableCell className="text-emerald-600">{formatNPR(je.items?.reduce((s:any,i:any)=>s+i.debit,0) || 0)}</TableCell>
+                        <TableCell className="text-rose-600">{formatNPR(je.items?.reduce((s:any,i:any)=>s+i.credit,0) || 0)}</TableCell>
+                        <TableCell><Badge className={statusColor(je.status)}>{je.status}</Badge></TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            {je.status === 'DRAFT' && (
+                              <>
+                                <Button variant="ghost" size="sm" className="text-emerald-600" title="Post" onClick={() => handleEntryAction(je.id, 'POSTED')}><CheckCircle2 className="w-4 h-4" /></Button>
+                                <Button variant="ghost" size="sm" className="text-red-600" title="Cancel" onClick={() => handleEntryAction(je.id, 'CANCELLED')}><X className="w-4 h-4" /></Button>
+                              </>
+                            )}
+                            <Button variant="ghost" size="sm" title="View"><Eye className="w-4 h-4" /></Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
-        <TabsContent value="chart" className="mt-4">
-          <Card className="border-0 shadow-sm"><CardContent className="p-0"><div className="overflow-x-auto">
-            <Table><TableHeader><TableRow className="bg-gray-50">
-              <TableHead className="font-semibold">Code</TableHead><TableHead className="font-semibold">Account Name</TableHead>
-              <TableHead className="font-semibold hidden sm:table-cell">नेपाली</TableHead><TableHead className="font-semibold">Type</TableHead>
-            </TableRow></TableHeader><TableBody>
-              {data.accounts.map(acct => (
-                <TableRow key={acct.id} className="hover:bg-gray-50">
-                  <TableCell className="font-mono text-sm">{acct.code}</TableCell>
-                  <TableCell className={acct.subType === 'HEADER' ? 'font-semibold' : ''}>{acct.name}</TableCell>
-                  <TableCell className="hidden sm:table-cell">{acct.nameNepali}</TableCell>
-                  <TableCell><Badge variant="outline" className={acct.type === 'ASSET' ? 'border-emerald-300 text-emerald-700' : acct.type === 'LIABILITY' ? 'border-rose-300 text-rose-700' : acct.type === 'INCOME' ? 'border-blue-300 text-blue-700' : acct.type === 'EXPENSE' ? 'border-amber-300 text-amber-700' : 'border-purple-300 text-purple-700'}>{acct.type}</Badge></TableCell>
-                </TableRow>
-              ))}
-            </TableBody></Table>
-          </div></CardContent></Card>
+
+        {/* ===== VOUCHERS TAB ===== */}
+        <TabsContent value="vouchers" className="mt-4 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer group" onClick={() => openVoucherCreate('PAYMENT')}>
+              <CardContent className="p-6 text-center">
+                <div className="w-14 h-14 rounded-xl bg-rose-100 text-rose-600 mx-auto mb-3 flex items-center justify-center group-hover:scale-110 transition-transform"><ArrowUpRight className="w-7 h-7" /></div>
+                <h3 className="font-semibold text-gray-900">Payment Voucher</h3>
+                <p className="text-xs text-gray-500">भुक्तानी भौचर (PV)</p>
+                <p className="text-xs text-gray-400 mt-1">Cash/Bank going OUT</p>
+              </CardContent>
+            </Card>
+            <Card className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer group" onClick={() => openVoucherCreate('RECEIPT')}>
+              <CardContent className="p-6 text-center">
+                <div className="w-14 h-14 rounded-xl bg-emerald-100 text-emerald-600 mx-auto mb-3 flex items-center justify-center group-hover:scale-110 transition-transform"><ArrowDownRight className="w-7 h-7" /></div>
+                <h3 className="font-semibold text-gray-900">Receipt Voucher</h3>
+                <p className="text-xs text-gray-500">प्राप्ति भौचर (RV)</p>
+                <p className="text-xs text-gray-400 mt-1">Cash/Bank coming IN</p>
+              </CardContent>
+            </Card>
+            <Card className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer group" onClick={() => openVoucherCreate('JOURNAL')}>
+              <CardContent className="p-6 text-center">
+                <div className="w-14 h-14 rounded-xl bg-blue-100 text-blue-600 mx-auto mb-3 flex items-center justify-center group-hover:scale-110 transition-transform"><BookOpen className="w-7 h-7" /></div>
+                <h3 className="font-semibold text-gray-900">Journal Voucher</h3>
+                <p className="text-xs text-gray-500">जर्नल भौचर (JV)</p>
+                <p className="text-xs text-gray-400 mt-1">General adjustment</p>
+              </CardContent>
+            </Card>
+            <Card className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer group" onClick={() => openVoucherCreate('CONTRA')}>
+              <CardContent className="p-6 text-center">
+                <div className="w-14 h-14 rounded-xl bg-purple-100 text-purple-600 mx-auto mb-3 flex items-center justify-center group-hover:scale-110 transition-transform"><RefreshCw className="w-7 h-7" /></div>
+                <h3 className="font-semibold text-gray-900">Contra Voucher</h3>
+                <p className="text-xs text-gray-500">कन्ट्रा भौचर (CV)</p>
+                <p className="text-xs text-gray-400 mt-1">Bank-to-Bank/Cash transfer</p>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
-        <TabsContent value="ledger" className="mt-4">
-          <Card className="border-0 shadow-sm"><CardHeader><CardTitle className="text-base">General Ledger</CardTitle><CardDescription>Select an account to view ledger entries</CardDescription></CardHeader>
-          <CardContent><div className="text-center py-12 text-gray-400"><BookOpen className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>Select an account to view ledger entries</p></div></CardContent></Card>
+
+        {/* ===== LEDGER TAB ===== */}
+        <TabsContent value="ledger" className="mt-4 space-y-4">
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base">General Ledger / खाता विवरण</CardTitle>
+              <CardDescription>Select an account and date range to view ledger entries</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4">
+                <div className="space-y-2">
+                  <Label>Account</Label>
+                  <Select value={ledgerAccountId} onValueChange={setLedgerAccountId}>
+                    <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                    <SelectContent>
+                      {nonHeaderAccounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <BSDatePicker label="From Date" value={ledgerFromDate} onChange={setLedgerFromDate} />
+                <BSDatePicker label="To Date" value={ledgerToDate} onChange={setLedgerToDate} />
+                <div className="flex items-end">
+                  <Button className="bg-emerald-600 hover:bg-emerald-700 w-full" onClick={fetchLedger} disabled={ledgerLoading}>
+                    {ledgerLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Eye className="w-4 h-4 mr-2" />} View Ledger
+                  </Button>
+                </div>
+              </div>
+
+              {ledgerData && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="font-semibold text-gray-900">{ledgerData.account?.code} - {ledgerData.account?.name}</p>
+                      <p className="text-xs text-gray-500">{ledgerData.account?.nameNepali} | {ledgerData.account?.type}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-500">Closing Balance</p>
+                      <p className={`font-bold text-lg ${ledgerData.closingBalance >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatNPR(Math.abs(ledgerData.closingBalance))} {ledgerData.closingBalance >= 0 ? 'Dr' : 'Cr'}</p>
+                    </div>
+                  </div>
+                  <Card className="border shadow-none"><CardContent className="p-0"><div className="overflow-x-auto">
+                    <Table><TableHeader><TableRow className="bg-gray-50">
+                      <TableHead className="font-semibold">Date</TableHead>
+                      <TableHead className="font-semibold">Voucher</TableHead>
+                      <TableHead className="font-semibold">Particulars</TableHead>
+                      <TableHead className="font-semibold text-right">Debit</TableHead>
+                      <TableHead className="font-semibold text-right">Credit</TableHead>
+                      <TableHead className="font-semibold text-right">Balance</TableHead>
+                    </TableRow></TableHeader><TableBody>
+                      {ledgerData.rows?.length === 0 ? (
+                        <TableRow><TableCell colSpan={6} className="text-center py-8 text-gray-400">No entries found</TableCell></TableRow>
+                      ) : (
+                        ledgerData.rows?.map((row: any, i: number) => (
+                          <TableRow key={i} className="hover:bg-gray-50">
+                            <TableCell className="text-sm">{row.date}</TableCell>
+                            <TableCell className="font-medium text-purple-600">{row.voucherNo}</TableCell>
+                            <TableCell className="text-sm">{row.narration}{row.description ? ` - ${row.description}` : ''}</TableCell>
+                            <TableCell className="text-right text-emerald-600">{row.debit > 0 ? formatNPR(row.debit) : ''}</TableCell>
+                            <TableCell className="text-right text-rose-600">{row.credit > 0 ? formatNPR(row.credit) : ''}</TableCell>
+                            <TableCell className={`text-right font-medium ${row.balance >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatNPR(Math.abs(row.balance))} {row.balance >= 0 ? 'Dr' : 'Cr'}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody></Table>
+                  </div></CardContent></Card>
+                </div>
+              )}
+              {!ledgerData && (
+                <div className="text-center py-12 text-gray-400"><BookOpen className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>Select an account to view ledger entries</p><p className="text-sm">खाता विवरण हेर्न खाता छान्नुहोस्</p></div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ===== TRIAL BALANCE TAB ===== */}
+        <TabsContent value="trial-balance" className="mt-4 space-y-4">
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Trial Balance / तल्ला परीक्षण</CardTitle>
+                  <CardDescription>Verify total debits equal total credits</CardDescription>
+                </div>
+                <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={fetchTrialBalance} disabled={trialBalanceLoading}>
+                  {trialBalanceLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />} Generate
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {trialBalanceData && (
+                <div className="space-y-3">
+                  <div className="p-3 bg-gray-50 rounded-lg flex items-center justify-between">
+                    <p className="text-sm text-gray-500">As of: {trialBalanceData.asOfDate}</p>
+                    <Badge className={trialBalanceData.isBalanced ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}>
+                      {trialBalanceData.isBalanced ? '✓ Balanced / सन्तुलित' : '✗ Not Balanced / असन्तुलित'}
+                    </Badge>
+                  </div>
+                  <Card className="border shadow-none"><CardContent className="p-0"><div className="overflow-x-auto">
+                    <Table><TableHeader><TableRow className="bg-gray-50">
+                      <TableHead className="font-semibold">Account Code</TableHead>
+                      <TableHead className="font-semibold">Account Name</TableHead>
+                      <TableHead className="font-semibold hidden sm:table-cell">Type</TableHead>
+                      <TableHead className="font-semibold text-right">Debit (NPR)</TableHead>
+                      <TableHead className="font-semibold text-right">Credit (NPR)</TableHead>
+                    </TableRow></TableHeader><TableBody>
+                      {trialBalanceData.rows?.map((row: any, i: number) => (
+                        <TableRow key={i} className="hover:bg-gray-50">
+                          <TableCell className="font-mono text-sm">{row.code}</TableCell>
+                          <TableCell><div>{row.name}</div>{row.nameNepali && <div className="text-xs text-gray-400">{row.nameNepali}</div>}</TableCell>
+                          <TableCell className="hidden sm:table-cell"><Badge variant="outline" className={row.type === 'ASSET' ? 'border-emerald-300 text-emerald-700' : row.type === 'LIABILITY' ? 'border-rose-300 text-rose-700' : row.type === 'INCOME' ? 'border-blue-300 text-blue-700' : row.type === 'EXPENSE' ? 'border-amber-300 text-amber-700' : 'border-purple-300 text-purple-700'}>{row.type}</Badge></TableCell>
+                          <TableCell className="text-right font-medium text-emerald-600">{row.debit > 0 ? formatNPR(row.debit) : ''}</TableCell>
+                          <TableCell className="text-right font-medium text-rose-600">{row.credit > 0 ? formatNPR(row.credit) : ''}</TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="bg-gray-100 font-bold">
+                        <TableCell colSpan={3} className="text-right">Total / जम्मा</TableCell>
+                        <TableCell className="text-right text-emerald-700">{formatNPR(trialBalanceData.totalDebit)}</TableCell>
+                        <TableCell className="text-right text-rose-700">{formatNPR(trialBalanceData.totalCredit)}</TableCell>
+                      </TableRow>
+                    </TableBody></Table>
+                  </div></CardContent></Card>
+                </div>
+              )}
+              {!trialBalanceData && (
+                <div className="text-center py-12 text-gray-400"><BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>Click Generate to create Trial Balance</p><p className="text-sm">तल्ला परीक्षण उत्पन्न गर्न बटन क्लिक गर्नुहोस्</p></div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ===== DAY BOOK TAB ===== */}
+        <TabsContent value="day-book" className="mt-4 space-y-4">
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Day Book / दैनिक पुस्तक</CardTitle>
+                  <CardDescription>All entries for a specific date</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <BSDatePicker label="Date" value={dayBookDate} onChange={setDayBookDate} />
+                  <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={fetchDayBook} disabled={dayBookLoading}>
+                    {dayBookLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Eye className="w-4 h-4 mr-2" />} View
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {dayBookData && (
+                <div className="space-y-3">
+                  <div className="p-3 bg-gray-50 rounded-lg flex items-center justify-between">
+                    <p className="text-sm text-gray-500">Date: {dayBookData.date} | {dayBookData.rows?.length || 0} entries</p>
+                    <div className="text-right">
+                      <span className="text-sm text-emerald-600 mr-4">Total Debit: {formatNPR(dayBookData.rows?.reduce((s: number, r: any) => s + r.totalDebit, 0) || 0)}</span>
+                      <span className="text-sm text-rose-600">Total Credit: {formatNPR(dayBookData.rows?.reduce((s: number, r: any) => s + r.totalCredit, 0) || 0)}</span>
+                    </div>
+                  </div>
+                  {dayBookData.rows?.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400"><FileText className="w-8 h-8 mx-auto mb-2 opacity-50" /><p>No entries for this date</p></div>
+                  ) : (
+                    dayBookData.rows?.map((row: any) => (
+                      <Card key={row.id} className="border shadow-none">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between cursor-pointer" onClick={() => setExpandedRow(expandedRow === row.id ? null : row.id)}>
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                row.entryType === 'PAYMENT' ? 'bg-rose-100 text-rose-600' :
+                                row.entryType === 'RECEIPT' ? 'bg-emerald-100 text-emerald-600' :
+                                row.entryType === 'CONTRA' ? 'bg-purple-100 text-purple-600' :
+                                'bg-blue-100 text-blue-600'
+                              }`}>
+                                {row.entryType === 'PAYMENT' ? <ArrowUpRight className="w-4 h-4" /> :
+                                 row.entryType === 'RECEIPT' ? <ArrowDownRight className="w-4 h-4" /> :
+                                 row.entryType === 'CONTRA' ? <RefreshCw className="w-4 h-4" /> :
+                                 <BookOpen className="w-4 h-4" />}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900">{row.voucherNo} - {row.narration}</p>
+                                <p className="text-xs text-gray-500">{row.entryType} | {row.date}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Badge className={statusColor(row.status)}>{row.status}</Badge>
+                              <span className="text-sm text-emerald-600">Dr: {formatNPR(row.totalDebit)}</span>
+                              <span className="text-sm text-rose-600">Cr: {formatNPR(row.totalCredit)}</span>
+                              {expandedRow === row.id ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                            </div>
+                          </div>
+                          {expandedRow === row.id && (
+                            <div className="mt-3 pt-3 border-t">
+                              <Table><TableHeader><TableRow className="bg-gray-50">
+                                <TableHead className="font-semibold">Account</TableHead>
+                                <TableHead className="font-semibold text-right">Debit</TableHead>
+                                <TableHead className="font-semibold text-right">Credit</TableHead>
+                                <TableHead className="font-semibold hidden sm:table-cell">Description</TableHead>
+                              </TableRow></TableHeader><TableBody>
+                                {row.items?.map((item: any, idx: number) => (
+                                  <TableRow key={idx} className="hover:bg-gray-50">
+                                    <TableCell>{item.accountCode} - {item.accountName}</TableCell>
+                                    <TableCell className="text-right text-emerald-600">{item.debit > 0 ? formatNPR(item.debit) : ''}</TableCell>
+                                    <TableCell className="text-right text-rose-600">{item.credit > 0 ? formatNPR(item.credit) : ''}</TableCell>
+                                    <TableCell className="hidden sm:table-cell text-sm text-gray-500">{item.description || '—'}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody></Table>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              )}
+              {!dayBookData && (
+                <div className="text-center py-12 text-gray-400"><FileText className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>Select a date and click View to see day book</p><p className="text-sm">दैनिक पुस्तक हेर्न मिति छान्नुहोस्</p></div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
+
+      {/* ===== NEW JOURNAL ENTRY / VOUCHER DIALOG ===== */}
+      <Dialog open={newEntryOpen} onOpenChange={setNewEntryOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {entryForm.entryType === 'PAYMENT' ? 'Payment Voucher / भुक्तानी भौचर' :
+               entryForm.entryType === 'RECEIPT' ? 'Receipt Voucher / प्राप्ति भौचर' :
+               entryForm.entryType === 'CONTRA' ? 'Contra Voucher / कन्ट्रा भौचर' :
+               'Journal Entry / जर्नल प्रविष्टि'}
+            </DialogTitle>
+            <DialogDescription>Create a new {entryForm.entryType.toLowerCase()} entry</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Voucher Type</Label>
+                <Select value={entryForm.entryType} onValueChange={v => setEntryForm({...entryForm, entryType: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="JOURNAL">Journal (JV)</SelectItem>
+                    <SelectItem value="PAYMENT">Payment (PV)</SelectItem>
+                    <SelectItem value="RECEIPT">Receipt (RV)</SelectItem>
+                    <SelectItem value="CONTRA">Contra (CV)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <BSDatePicker label="Date (BS)" value={entryForm.date} onChange={v => setEntryForm({...entryForm, date: v})} />
+              <div className="space-y-2">
+                <Label>Narration *</Label>
+                <Input placeholder="Description of entry" value={entryForm.narration} onChange={e => setEntryForm({...entryForm, narration: e.target.value})} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Narration (नेपाली)</Label>
+              <Input placeholder="नेपालीमा विवरण" value={entryForm.narrationNep} onChange={e => setEntryForm({...entryForm, narrationNep: e.target.value})} />
+            </div>
+
+            {/* Line Items Table */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="font-semibold">Line Items / लाइन आइटम</Label>
+                <Button variant="outline" size="sm" onClick={addItem}><Plus className="w-3 h-3 mr-1" /> Add Row</Button>
+              </div>
+              <Card className="border shadow-none"><CardContent className="p-0"><div className="overflow-x-auto">
+                <Table><TableHeader><TableRow className="bg-gray-50">
+                  <TableHead className="font-semibold">Account</TableHead>
+                  <TableHead className="font-semibold text-right">Debit (NPR)</TableHead>
+                  <TableHead className="font-semibold text-right">Credit (NPR)</TableHead>
+                  <TableHead className="font-semibold hidden sm:table-cell">Description</TableHead>
+                  <TableHead className="font-semibold w-10"></TableHead>
+                </TableRow></TableHeader><TableBody>
+                  {entryForm.items.map((item, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell>
+                        <Select value={item.accountId} onValueChange={v => updateItem(idx, 'accountId', v)}>
+                          <SelectTrigger className="w-48"><SelectValue placeholder="Select account" /></SelectTrigger>
+                          <SelectContent>
+                            {nonHeaderAccounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell><Input type="number" className="w-28 text-right" value={item.debit || ''} onChange={e => updateItem(idx, 'debit', parseFloat(e.target.value) || 0)} /></TableCell>
+                      <TableCell><Input type="number" className="w-28 text-right" value={item.credit || ''} onChange={e => updateItem(idx, 'credit', parseFloat(e.target.value) || 0)} /></TableCell>
+                      <TableCell className="hidden sm:table-cell"><Input className="w-40" value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)} placeholder="Details" /></TableCell>
+                      <TableCell>
+                        {entryForm.items.length > 2 && (
+                          <Button variant="ghost" size="sm" className="text-red-500" onClick={() => removeItem(idx)}><Trash2 className="w-4 h-4" /></Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody></Table>
+              </div></CardContent></Card>
+            </div>
+
+            {/* Totals */}
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div className="flex gap-6">
+                <div><span className="text-sm text-gray-500">Total Debit: </span><span className="font-bold text-emerald-600">{formatNPR(totalDebit)}</span></div>
+                <div><span className="text-sm text-gray-500">Total Credit: </span><span className="font-bold text-rose-600">{formatNPR(totalCredit)}</span></div>
+              </div>
+              <Badge className={isBalanced ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}>
+                {isBalanced ? '✓ Balanced' : `✗ Difference: ${formatNPR(Math.abs(totalDebit - totalCredit))}`}
+              </Badge>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewEntryOpen(false)}>Cancel</Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleSubmitEntry} disabled={saving || !isBalanced || !entryForm.narration || entryForm.items.some(i => !i.accountId)}>
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Submit Entry
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -1179,14 +2046,12 @@ function HRModule({ data, onRefresh }: { data: DashboardData; onRefresh: () => v
           </DialogContent>
         </Dialog>
       </div>
-
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-teal-600">{data.employees.length}</p><p className="text-xs text-gray-500">Employees</p></CardContent></Card>
         <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-emerald-600">{data.employees.filter(e=>e.status==='ACTIVE').length}</p><p className="text-xs text-gray-500">Active</p></CardContent></Card>
         <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-blue-600">{formatNPR(totalSalary)}</p><p className="text-xs text-gray-500">Monthly Salary</p></CardContent></Card>
         <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><p className="text-2xl font-bold text-purple-600">{new Set(data.employees.map(e=>e.department)).size}</p><p className="text-xs text-gray-500">Departments</p></CardContent></Card>
       </div>
-
       <Card className="border-0 shadow-sm"><CardContent className="p-0"><div className="overflow-x-auto">
         <Table><TableHeader><TableRow className="bg-gray-50">
           <TableHead className="font-semibold">Emp ID</TableHead><TableHead className="font-semibold">Name</TableHead>
@@ -1364,11 +2229,13 @@ function MeetingsModule({ data, onRefresh }: { data: DashboardData; onRefresh: (
 }
 
 // ============================================================
-// REPORTS MODULE (with NRB)
+// REPORTS MODULE (Enhanced - with new accounting reports)
 // ============================================================
 function ReportsModule({ data }: { data: DashboardData }) {
   const [reportData, setReportData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [accountingReportData, setAccountingReportData] = useState<any>(null)
+  const [accountingLoading, setAccountingLoading] = useState(false)
 
   const generateReport = async (type: string) => {
     setLoading(true)
@@ -1392,11 +2259,21 @@ function ReportsModule({ data }: { data: DashboardData }) {
     setLoading(false)
   }
 
+  const generateAccountingReport = async (type: string) => {
+    setAccountingLoading(true)
+    try {
+      const res = await fetch(`/api/accounting/reports?type=${type}`)
+      const d = await res.json()
+      setAccountingReportData({ ...d, _reportType: type })
+      toast.success('Accounting report generated! / लेखा प्रतिवेदन तयार भयो!')
+    } catch { toast.error('Failed to generate accounting report') }
+    setAccountingLoading(false)
+  }
+
   const downloadReport = async (type: string) => {
     try {
       const res = await fetch(`/api/reports/nrb?type=${type}`)
       const data = await res.json()
-      // Create a downloadable JSON file
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -1421,6 +2298,16 @@ function ReportsModule({ data }: { data: DashboardData }) {
     { name: 'Audit Trail', nameNep: 'अडिट ट्रेल', icon: BookOpen, color: 'bg-slate-100 text-slate-600', type: 'audit' },
   ]
 
+  // NEW: Accounting-specific reports
+  const accountingReports = [
+    { name: 'Trial Balance', nameNep: 'तल्ला परीक्षण', icon: BarChart3, color: 'bg-purple-100 text-purple-600', type: 'trial-balance' },
+    { name: 'Day Book', nameNep: 'दैनिक पुस्तक', icon: FileText, color: 'bg-blue-100 text-blue-600', type: 'day-book' },
+    { name: 'Ledger Report', nameNep: 'खाता विवरण', icon: BookOpen, color: 'bg-emerald-100 text-emerald-600', type: 'ledger' },
+    { name: 'Cash Book', nameNep: 'नगद पुस्तक', icon: Banknote, color: 'bg-amber-100 text-amber-600', type: 'cash-book' },
+    { name: 'Bank Book', nameNep: 'बैंक पुस्तक', icon: Building2, color: 'bg-cyan-100 text-cyan-600', type: 'bank-book' },
+    { name: 'Voucher Report', nameNep: 'भौचर प्रतिवेदन', icon: Receipt, color: 'bg-rose-100 text-rose-600', type: 'voucher' },
+  ]
+
   const nrbReports = [
     { name: 'Balance Sheet (NRB)', nameNep: 'निश्शेष जानकारी', icon: FileText, color: 'bg-red-100 text-red-600', type: 'balance-sheet' },
     { name: 'Income Statement (NRB)', nameNep: 'आय-व्यय जानकारी', icon: TrendingUp, color: 'bg-red-100 text-red-600', type: 'income-statement' },
@@ -1436,6 +2323,7 @@ function ReportsModule({ data }: { data: DashboardData }) {
     <div className="space-y-6">
       <div><h2 className="text-2xl font-bold text-gray-900">Reports & Analytics</h2><p className="text-gray-500 text-sm">प्रतिवेदन र विश्लेषण</p></div>
 
+      {/* General Reports */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {reports.map((r, i) => (
           <Card key={i} className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer group" onClick={() => generateReport(r.type)}>
@@ -1450,6 +2338,182 @@ function ReportsModule({ data }: { data: DashboardData }) {
           </Card>
         ))}
       </div>
+
+      {/* Accounting Reports (NEW) */}
+      <div className="mt-8">
+        <div className="flex items-center gap-2 mb-4">
+          <BookOpen className="w-5 h-5 text-purple-600" />
+          <h3 className="text-lg font-bold text-gray-900">Accounting Reports / लेखा प्रतिवेदन</h3>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          {accountingReports.map((r, i) => (
+            <Card key={i} className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer group" onClick={() => generateAccountingReport(r.type)}>
+              <CardContent className="p-4">
+                <div className={`w-10 h-10 rounded-lg ${r.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}><r.icon className="w-5 h-5" /></div>
+                <h3 className="font-medium text-gray-900 text-sm">{r.name}</h3>
+                <p className="text-xs text-gray-400">{r.nameNep}</p>
+                <Button variant="ghost" size="sm" className="mt-2 text-xs h-7" disabled={accountingLoading}>
+                  {accountingLoading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Eye className="w-3 h-3 mr-1" />} Generate
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Accounting Report Display */}
+      {accountingReportData && (
+        <Card className="border-0 shadow-sm">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">
+                  {accountingReportData._reportType === 'trial-balance' ? 'Trial Balance / तल्ला परीक्षण' :
+                   accountingReportData._reportType === 'day-book' ? 'Day Book / दैनिक पुस्तक' :
+                   accountingReportData._reportType === 'cash-book' ? 'Cash Book / नगद पुस्तक' :
+                   accountingReportData._reportType === 'bank-book' ? 'Bank Book / बैंक पुस्तक' :
+                   accountingReportData._reportType === 'ledger' ? 'Ledger Report / खाता विवरण' :
+                   'Voucher Report / भौचर प्रतिवेदन'}
+                </CardTitle>
+                <CardDescription>FY 2082/83 | Generated: {formatBSDate(getTodayBS()).nep}</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setAccountingReportData(null)}><X className="w-4 h-4" /></Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {/* Trial Balance */}
+            {accountingReportData._reportType === 'trial-balance' && accountingReportData.rows && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm text-gray-500">As of: {accountingReportData.asOfDate}</span>
+                  <Badge className={accountingReportData.isBalanced ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}>
+                    {accountingReportData.isBalanced ? '✓ Balanced' : '✗ Not Balanced'}
+                  </Badge>
+                </div>
+                <Card className="border shadow-none"><CardContent className="p-0"><div className="overflow-x-auto">
+                  <Table><TableHeader><TableRow className="bg-gray-50">
+                    <TableHead className="font-semibold">Code</TableHead><TableHead className="font-semibold">Account Name</TableHead>
+                    <TableHead className="font-semibold text-right">Debit</TableHead><TableHead className="font-semibold text-right">Credit</TableHead>
+                  </TableRow></TableHeader><TableBody>
+                    {accountingReportData.rows.map((row: any, i: number) => (
+                      <TableRow key={i} className="hover:bg-gray-50">
+                        <TableCell className="font-mono text-sm">{row.code}</TableCell>
+                        <TableCell>{row.name}</TableCell>
+                        <TableCell className="text-right text-emerald-600">{row.debit > 0 ? formatNPR(row.debit) : ''}</TableCell>
+                        <TableCell className="text-right text-rose-600">{row.credit > 0 ? formatNPR(row.credit) : ''}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="bg-gray-100 font-bold">
+                      <TableCell colSpan={2} className="text-right">Total</TableCell>
+                      <TableCell className="text-right text-emerald-700">{formatNPR(accountingReportData.totalDebit)}</TableCell>
+                      <TableCell className="text-right text-rose-700">{formatNPR(accountingReportData.totalCredit)}</TableCell>
+                    </TableRow>
+                  </TableBody></Table>
+                </div></CardContent></Card>
+              </div>
+            )}
+            {/* Day Book */}
+            {accountingReportData._reportType === 'day-book' && (
+              <div className="space-y-3">
+                <div className="p-3 bg-gray-50 rounded-lg"><span className="text-sm text-gray-500">Date: {accountingReportData.date} | {accountingReportData.rows?.length || 0} entries</span></div>
+                {accountingReportData.rows?.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400"><p>No entries for this date</p></div>
+                ) : (
+                  <Card className="border shadow-none"><CardContent className="p-0"><div className="overflow-x-auto">
+                    <Table><TableHeader><TableRow className="bg-gray-50">
+                      <TableHead className="font-semibold">Voucher</TableHead><TableHead className="font-semibold">Narration</TableHead>
+                      <TableHead className="font-semibold">Type</TableHead><TableHead className="font-semibold text-right">Debit</TableHead>
+                      <TableHead className="font-semibold text-right">Credit</TableHead><TableHead className="font-semibold">Status</TableHead>
+                    </TableRow></TableHeader><TableBody>
+                      {accountingReportData.rows.map((row: any, i: number) => (
+                        <TableRow key={i} className="hover:bg-gray-50">
+                          <TableCell className="font-medium text-purple-600">{row.voucherNo}</TableCell>
+                          <TableCell className="max-w-xs truncate">{row.narration}</TableCell>
+                          <TableCell><Badge variant="outline">{row.entryType}</Badge></TableCell>
+                          <TableCell className="text-right text-emerald-600">{formatNPR(row.totalDebit)}</TableCell>
+                          <TableCell className="text-right text-rose-600">{formatNPR(row.totalCredit)}</TableCell>
+                          <TableCell><Badge className={statusColor(row.status)}>{row.status}</Badge></TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody></Table>
+                  </div></CardContent></Card>
+                )}
+              </div>
+            )}
+            {/* Cash/Bank Book */}
+            {(accountingReportData._reportType === 'cash-book' || accountingReportData._reportType === 'bank-book') && (
+              <div className="space-y-3">
+                <div className="p-3 bg-gray-50 rounded-lg flex items-center justify-between">
+                  <span className="text-sm text-gray-500">Account: {accountingReportData.accountName}</span>
+                  <span className="text-sm font-medium">Closing Balance: <span className="text-emerald-600">{formatNPR(accountingReportData.closingBalance)}</span></span>
+                </div>
+                {accountingReportData.rows?.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400"><p>No entries found</p></div>
+                ) : (
+                  <Card className="border shadow-none"><CardContent className="p-0"><div className="overflow-x-auto">
+                    <Table><TableHeader><TableRow className="bg-gray-50">
+                      <TableHead className="font-semibold">Date</TableHead><TableHead className="font-semibold">Voucher</TableHead>
+                      <TableHead className="font-semibold">Particulars</TableHead>
+                      <TableHead className="font-semibold text-right">Debit</TableHead><TableHead className="font-semibold text-right">Credit</TableHead>
+                      <TableHead className="font-semibold text-right">Balance</TableHead>
+                    </TableRow></TableHeader><TableBody>
+                      {accountingReportData.rows.map((row: any, i: number) => (
+                        <TableRow key={i} className="hover:bg-gray-50">
+                          <TableCell className="text-sm">{row.date}</TableCell>
+                          <TableCell className="font-medium text-purple-600">{row.voucherNo}</TableCell>
+                          <TableCell className="text-sm">{row.narration}</TableCell>
+                          <TableCell className="text-right text-emerald-600">{row.debit > 0 ? formatNPR(row.debit) : ''}</TableCell>
+                          <TableCell className="text-right text-rose-600">{row.credit > 0 ? formatNPR(row.credit) : ''}</TableCell>
+                          <TableCell className="text-right font-medium">{formatNPR(row.balance)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody></Table>
+                  </div></CardContent></Card>
+                )}
+              </div>
+            )}
+            {/* Ledger Report */}
+            {accountingReportData._reportType === 'ledger' && (
+              <div className="space-y-3">
+                <div className="p-3 bg-gray-50 rounded-lg flex items-center justify-between">
+                  <div>
+                    <span className="text-sm font-medium">{accountingReportData.account?.code} - {accountingReportData.account?.name}</span>
+                    <span className="text-xs text-gray-500 ml-2">({accountingReportData.account?.type})</span>
+                  </div>
+                  <span className="text-sm font-medium">Closing: <span className="text-emerald-600">{formatNPR(Math.abs(accountingReportData.closingBalance))} {accountingReportData.closingBalance >= 0 ? 'Dr' : 'Cr'}</span></span>
+                </div>
+                {accountingReportData.rows?.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400"><p>No entries found</p></div>
+                ) : (
+                  <Card className="border shadow-none"><CardContent className="p-0"><div className="overflow-x-auto">
+                    <Table><TableHeader><TableRow className="bg-gray-50">
+                      <TableHead className="font-semibold">Date</TableHead><TableHead className="font-semibold">Voucher</TableHead>
+                      <TableHead className="font-semibold">Particulars</TableHead>
+                      <TableHead className="font-semibold text-right">Debit</TableHead><TableHead className="font-semibold text-right">Credit</TableHead>
+                      <TableHead className="font-semibold text-right">Balance</TableHead>
+                    </TableRow></TableHeader><TableBody>
+                      {accountingReportData.rows.map((row: any, i: number) => (
+                        <TableRow key={i} className="hover:bg-gray-50">
+                          <TableCell className="text-sm">{row.date}</TableCell>
+                          <TableCell className="font-medium text-purple-600">{row.voucherNo}</TableCell>
+                          <TableCell className="text-sm">{row.narration}</TableCell>
+                          <TableCell className="text-right text-emerald-600">{row.debit > 0 ? formatNPR(row.debit) : ''}</TableCell>
+                          <TableCell className="text-right text-rose-600">{row.credit > 0 ? formatNPR(row.credit) : ''}</TableCell>
+                          <TableCell className="text-right font-medium">{formatNPR(Math.abs(row.balance))} {row.balance >= 0 ? 'Dr' : 'Cr'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody></Table>
+                  </div></CardContent></Card>
+                )}
+              </div>
+            )}
+            {/* Voucher Report (placeholder) */}
+            {accountingReportData._reportType === 'voucher' && (
+              <div className="text-center py-8 text-gray-400"><FileText className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>Voucher report - Navigate to Accounting module for detailed voucher view</p></div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* NRB Regulatory Reports Section */}
       <div className="mt-8">
@@ -1482,6 +2546,7 @@ function ReportsModule({ data }: { data: DashboardData }) {
         </div>
       </div>
 
+      {/* General Report Display */}
       {reportData && (
         <Card className="border-0 shadow-sm">
           <CardHeader>

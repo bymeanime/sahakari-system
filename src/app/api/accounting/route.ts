@@ -12,6 +12,7 @@ export async function GET() {
     ])
     return NextResponse.json({ entries, accounts })
   } catch (error) {
+    console.error('Accounting GET error:', error)
     return NextResponse.json({ error: 'Failed to fetch accounting data' }, { status: 500 })
   }
 }
@@ -45,7 +46,23 @@ export async function POST(request: Request) {
       )
     }
 
-    // Fix 9: Fiscal year locking check
+    // Validate each item has either debit or credit (not both zero, not both non-zero)
+    for (const item of body.items) {
+      if ((item.debit || 0) > 0 && (item.credit || 0) > 0) {
+        return NextResponse.json(
+          { error: 'A line item cannot have both debit and credit amounts / एउटा लाइन आइटममा डेबिट र क्रेडिट दुवै हुन सक्दैन' },
+          { status: 400 }
+        )
+      }
+      if ((item.debit || 0) === 0 && (item.credit || 0) === 0) {
+        return NextResponse.json(
+          { error: 'A line item must have either debit or credit amount / एउटा लाइन आइटममा डेबिट वा क्रेडिट रकम हुनुपर्छ' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Fiscal year locking check
     const entryDate = body.date
     if (entryDate) {
       const activeFiscalYear = await db.fiscalYear.findFirst({
@@ -65,15 +82,28 @@ export async function POST(request: Request) {
       }
       if (entryDate < activeFiscalYear.startDate || entryDate > activeFiscalYear.endDate) {
         return NextResponse.json(
-          { error: `Entry date must be within active fiscal year (${activeFiscalYear.startDate} to ${activeFiscalYear.endDate}) / प्रविष्टि मिति सक्रिय आर्थिक वर्षभित्र हुनुपर्छ (${activeFiscalYear.startDate} देखि ${activeFiscalYear.endDate})` },
+          { error: `Entry date must be within active fiscal year (${activeFiscalYear.startDate} to ${activeFiscalYear.endDate}) / प्रविष्टि मिति सक्रिय आर्थिक वर्षभित्र हुनुपर्छ` },
           { status: 400 }
         )
       }
     }
 
-    const lastEntry = await db.journalEntry.findFirst({ orderBy: { voucherNo: 'desc' } })
-    const nextNum = lastEntry ? parseInt(lastEntry.voucherNo.replace('JE-', '')) + 1 : 1
-    const voucherNo = `JE-${String(nextNum).padStart(3, '0')}`
+    // Generate voucher number based on entry type
+    const entryType = body.entryType || 'JOURNAL'
+    const prefixMap: Record<string, string> = {
+      JOURNAL: 'JE',
+      PAYMENT: 'PV',
+      RECEIPT: 'RV',
+      CONTRA: 'CV',
+    }
+    const prefix = prefixMap[entryType] || 'JE'
+
+    const lastEntry = await db.journalEntry.findFirst({
+      where: { voucherNo: { startsWith: prefix } },
+      orderBy: { voucherNo: 'desc' },
+    })
+    const nextNum = lastEntry ? parseInt(lastEntry.voucherNo.replace(`${prefix}-`, '')) + 1 : 1
+    const voucherNo = `${prefix}-${String(nextNum).padStart(4, '0')}`
 
     const entry = await db.journalEntry.create({
       data: {
@@ -81,8 +111,8 @@ export async function POST(request: Request) {
         date: body.date,
         narration: body.narration,
         narrationNep: body.narrationNep || null,
-        status: 'DRAFT',
-        entryType: body.entryType || 'JOURNAL',
+        status: body.status || 'DRAFT',
+        entryType,
         items: {
           create: body.items.map((item: any) => ({
             accountId: item.accountId,
@@ -93,12 +123,12 @@ export async function POST(request: Request) {
           })),
         },
       },
-      include: { items: true },
+      include: { items: { include: { debitAccount: true, creditAccount: true } } },
     })
 
     return NextResponse.json(entry, { status: 201 })
   } catch (error) {
     console.error('Journal entry error:', error)
-    return NextResponse.json({ error: 'Failed to create journal entry' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to create journal entry / जर्नल प्रविष्टि सिर्जना गर्न असफल' }, { status: 500 })
   }
 }

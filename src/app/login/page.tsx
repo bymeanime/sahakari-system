@@ -30,40 +30,36 @@ export default function LoginPage() {
       })
 
       if (result?.error) {
-        setError(result.error === 'CredentialsSignin' ? 'Invalid email or password' : result.error)
+        setError(result.error === 'CredentialsSignin' ? 'Invalid email or password / गलत ईमेल वा पासवर्ड' : result.error)
         setLoading(false)
       } else if (result?.ok) {
-        // Small delay to ensure session cookie is set
-        setTimeout(() => {
-          router.push('/')
-          router.refresh()
-        }, 500)
+        // Use window.location for a hard redirect to ensure session cookie is picked up
+        window.location.href = '/'
       } else {
-        setError('Login failed. Please try again.')
+        setError('Login failed. Please try again. / लगइन असफल। पुनः प्रयास गर्नुहोस्।')
         setLoading(false)
       }
     } catch (err) {
-      setError('An unexpected error occurred')
+      setError('An unexpected error occurred / अप्रत्याशित त्रुटि भयो')
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-emerald-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 p-4">
       <div className="w-full max-w-md">
-        {/* Logo & Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-600 text-white mb-4">
-            <Shield className="w-8 h-8" />
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mx-auto mb-4 shadow-lg">
+            <Shield className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">सहकारी प्रणाली</h1>
-          <p className="text-sm text-gray-500 mt-1">Sahakari System Management</p>
-          <p className="text-xs text-gray-400 mt-0.5">Nepal Cooperative Banking Software</p>
+          <h1 className="text-3xl font-bold text-gray-900">सहकारी प्रणाली</h1>
+          <p className="text-emerald-600 mt-1">Sahakari System Management</p>
+          <p className="text-gray-500 text-sm mt-1">Nepal Cooperative Banking Software</p>
         </div>
 
-        <Card className="shadow-xl border-0">
+        <Card className="border-0 shadow-xl">
           <CardHeader className="pb-4">
-            <CardTitle className="text-xl">Sign In</CardTitle>
+            <CardTitle className="text-xl">Sign In / साइन इन</CardTitle>
             <CardDescription>Enter your credentials to access the system</CardDescription>
           </CardHeader>
           <CardContent>
@@ -76,7 +72,7 @@ export default function LoginPage() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="email">Email Address / ईमेल</Label>
                 <Input
                   id="email"
                   type="email"
@@ -89,7 +85,7 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">Password / पासवर्ड</Label>
                 <div className="relative">
                   <Input
                     id="password"
@@ -110,19 +106,18 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full h-11 bg-blue-600 hover:bg-blue-700" disabled={loading}>
+              <Button type="submit" className="w-full h-11 bg-emerald-600 hover:bg-emerald-700" disabled={loading}>
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Signing in...
                   </>
                 ) : (
-                  'Sign In'
+                  'Sign In / साइन इन'
                 )}
               </Button>
             </form>
 
-            {/* Demo Credentials */}
             <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
               <p className="text-xs font-semibold text-gray-600 mb-2">Demo Credentials:</p>
               <div className="space-y-1 text-xs text-gray-500">
