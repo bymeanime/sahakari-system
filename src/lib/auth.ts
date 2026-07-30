@@ -60,35 +60,30 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user }) {
+      // Only add custom fields when user first signs in
       if (user) {
-        token.role = (user as any).role
-        token.organizationId = (user as any).organizationId
-        token.branchId = (user as any).branchId
-        token.lastActivity = Date.now()
+        token.role = (user as any).role as string
+        token.organizationId = (user as any).organizationId as string
+        token.branchId = (user as any).branchId as string
       }
-
-      // Fix 10: Session timeout - check if user has been idle for more than 15 minutes
-      const SESSION_TIMEOUT_MS = 15 * 60 * 1000 // 15 minutes
-      if (token.lastActivity && Date.now() - (token.lastActivity as number) > SESSION_TIMEOUT_MS) {
-        // Force re-authentication by returning an empty token
-        return {} as any
-      }
-
-      // Update last activity timestamp on each request
-      token.lastActivity = Date.now()
-
       return token
     },
     async session({ session, token }) {
-      // If token is empty (timed out), return empty session to force re-login
-      if (!token.role) {
-        return { ...session, user: null } as any
-      }
-
+      // Safely copy custom fields from token to session
       if (session.user) {
-        (session.user as any).role = token.role
-        (session.user as any).organizationId = token.organizationId
-        (session.user as any).branchId = token.branchId
+        const role = token.role as string | undefined
+        const organizationId = token.organizationId as string | undefined
+        const branchId = token.branchId as string | undefined
+
+        if (role) {
+          (session.user as any).role = role
+        }
+        if (organizationId) {
+          (session.user as any).organizationId = organizationId
+        }
+        if (branchId) {
+          (session.user as any).branchId = branchId
+        }
       }
       return session
     },

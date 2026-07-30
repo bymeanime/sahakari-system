@@ -31,13 +31,19 @@ export default function LoginPage() {
 
       if (result?.error) {
         setError(result.error === 'CredentialsSignin' ? 'Invalid email or password' : result.error)
+        setLoading(false)
+      } else if (result?.ok) {
+        // Small delay to ensure session cookie is set
+        setTimeout(() => {
+          router.push('/')
+          router.refresh()
+        }, 500)
       } else {
-        router.push('/')
-        router.refresh()
+        setError('Login failed. Please try again.')
+        setLoading(false)
       }
     } catch (err) {
       setError('An unexpected error occurred')
-    } finally {
       setLoading(false)
     }
   }
@@ -116,26 +122,24 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            {/* Demo Credentials - Only shown in development mode */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
-                <p className="text-xs font-semibold text-gray-600 mb-2">Demo Credentials:</p>
-                <div className="space-y-1 text-xs text-gray-500">
-                  <div className="flex justify-between">
-                    <span>Super Admin:</span>
-                    <span className="font-mono">admin@janatasahakari.org.np</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Manager:</span>
-                    <span className="font-mono">manager@janatasahakari.org.np</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Password:</span>
-                    <span className="font-mono">admin123</span>
-                  </div>
+            {/* Demo Credentials */}
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
+              <p className="text-xs font-semibold text-gray-600 mb-2">Demo Credentials:</p>
+              <div className="space-y-1 text-xs text-gray-500">
+                <div className="flex justify-between">
+                  <span>Super Admin:</span>
+                  <span className="font-mono">admin@janatasahakari.org.np</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Manager:</span>
+                  <span className="font-mono">manager@janatasahakari.org.np</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Password:</span>
+                  <span className="font-mono">admin123</span>
                 </div>
               </div>
-            )}
+            </div>
           </CardContent>
         </Card>
 
