@@ -63,22 +63,8 @@ async function main() {
     },
   })
 
-  // 3. Create Users
-  await db.user.upsert({
-    where: { email: 'admin@janatasahakari.org.np' },
-    update: {},
-    create: {
-      email: 'admin@janatasahakari.org.np',
-      password: 'admin123',
-      name: 'Ram Bahadur Shrestha',
-      nameNepali: 'राम बहादुर श्रेष्ठ',
-      phone: '9841234567',
-      role: 'ADMIN',
-      organizationId: ORG_ID,
-      branchId: BRANCH_ID_MAIN,
-      isActive: true,
-    },
-  })
+  // 3. Create Users (password will be hashed in section 18)
+  // Skip early user creation - users are created with hashed passwords below
 
   // 4. Create Members
   const memberData = [
@@ -527,7 +513,7 @@ async function main() {
   for (const u of users) {
     await db.user.upsert({
       where: { email: u.email },
-      update: {},
+      update: { password: hashedPassword },
       create: {
         email: u.email,
         password: hashedPassword,
