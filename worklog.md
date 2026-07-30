@@ -121,3 +121,33 @@ Stage Summary:
 - 22 critical/high fixes applied based on expert reviews
 - System now compliant with: NRB directives, Cooperative Act 2047, accounting standards
 - Build passes successfully, all 30+ API routes operational
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Fix login, overhaul accounting with vouchers/ledger/trial balance, enhance savings/loans/reports
+
+Work Log:
+- Fixed NEXTAUTH_URL in .env from localhost to production URL (https://sahakari-system.vercel.app)
+- Updated Vercel environment variable NEXTAUTH_URL to correct production URL
+- Rewrote login page (src/app/login/page.tsx) with proper redirect using window.location.href
+- Fixed auth.ts to handle production cookies properly with secure flag
+- Completely rewrote page.tsx (1,739 → 2,803 lines) with:
+  - Accounting Module: Journal Entry form, Voucher types (PV/RV/JV/CV), Ledger, Trial Balance, Day Book
+  - Savings Module: New Account dialog, account detail view, transaction history
+  - Loans Module: New Application dialog, EMI schedule
+  - Reports Module: Added Trial Balance, Day Book, Ledger, Cash Book, Bank Book, Voucher Report
+- Added new API route: /api/accounting/reports (trial balance, ledger, day book, cash book, bank book)
+- Enhanced /api/accounting POST to support voucher-specific prefixes (PV-, RV-, CV-, JE-)
+- All dates now default to getTodayBS() (current Bikram Sambat date)
+- Created and tested all 4 voucher types: PV-0001, RV-0001, CV-0001, JE-0004
+- Deployed to Vercel via git push
+- Verified all APIs work: login, dashboard, accounting, trial balance, ledger, day book
+
+Stage Summary:
+- Login fixed: uses window.location.href for hard redirect after NextAuth signIn
+- Accounting module fully functional with double-entry validation, voucher types, post/cancel
+- Trial Balance generates correctly (balanced: Dr=548000, Cr=548000)
+- Ledger shows running balance for selected accounts
+- Day Book shows all entries with expandable items
+- All new features deployed to production at https://sahakari-system.vercel.app
