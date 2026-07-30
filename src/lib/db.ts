@@ -1,10 +1,11 @@
 import { PrismaClient } from '@prisma/client'
 
-// Fix DATABASE_URL for Vercel serverless environment
-// The schema requires postgresql:// but Vercel may not set DATABASE_URL correctly
-// We need to ensure DATABASE_URL is a valid PostgreSQL URL before PrismaClient is created
-function ensureDatabaseUrl(): string {
-  // Check all possible sources for a valid PostgreSQL URL
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined
+}
+
+// Get a valid PostgreSQL URL from available env vars
+function getValidPostgresUrl(): string | undefined {
   const candidates = [
     process.env.POSTGRES_PRISMA_URL,
     process.env.DATABASE_URL,
@@ -19,28 +20,34 @@ function ensureDatabaseUrl(): string {
     }
   }
 
-  // Fallback: if no valid URL found, throw a helpful error
-  throw new Error(
-    'No valid PostgreSQL DATABASE_URL found. Checked: POSTGRES_PRISMA_URL, DATABASE_URL, DATABASE_URL_UNPOOLED, POSTGRES_URL, POSTGRES_URL_NON_POOLING'
-  )
+  return undefined
 }
 
-// Set DATABASE_URL before PrismaClient is instantiated
-// This is critical for Vercel serverless where the env var might not be set correctly
-const validUrl = ensureDatabaseUrl()
-if (!process.env.DATABASE_URL || !process.env.DATABASE_URL.startsWith('postgresql://')) {
-  process.env.DATABASE_URL = validUrl
-}
+// Create PrismaClient with lazy connection
+// During build time, env vars may not be available, so we use a placeholder
+// that will be replaced at runtime when the first query is made
+function createPrismaClient(): PrismaClient {
+  const validUrl = getValidPostgresUrl()
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
-}
+  if (validUrl) {
+    // Override DATABASE_URL to ensure Prisma uses the correct URL
+    process.env.DATABASE_URL = validUrl
+    return new PrismaClient({
+      log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+      datasourceUrl: validUrl,
+    })
+  }
 
-export const db =
-  globalForPrisma.prisma ??
-  new PrismaClient({
+  // During build time or when no valid URL is available,
+  // create PrismaClient without datasourceUrl override.
+  // Prisma will use the schema's env("DATABASE_URL") which should
+  // be set by Vercel at runtime.
+  // If DATABASE_URL is not set at all, Prisma will throw a clear error.
+  return new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
-    datasourceUrl: validUrl,
   })
+}
+
+export const db = globalForPrisma.prisma ?? createPrismaClient()
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
