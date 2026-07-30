@@ -513,8 +513,8 @@ async function main() {
   })
 
   // 18. Create Users for Authentication
-  const bcrypt = require('bcryptjs')
-  const hashedPassword = await bcrypt.hash('admin123', 10)
+  const bcryptModule = await import('bcryptjs')
+  const hashedPassword = await bcryptModule.default.hash('admin123', 10)
 
   const users = [
     { email: 'admin@janatasahakari.org.np', name: 'Ram Bahadur Shrestha', nameNepali: 'राम बहादुर श्रेष्ठ', role: 'SUPER_ADMIN', phone: '9841234567' },
