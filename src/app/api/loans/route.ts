@@ -31,7 +31,6 @@ export async function POST(request: Request) {
     const body = await request.json()
 
     if (body.action === 'approve') {
-      // Fix 6: Check minimum share holding for loan eligibility
       const loan = await db.loanApplication.findUnique({
         where: { applicationNo: body.applicationNo },
       })
@@ -55,6 +54,12 @@ export async function POST(request: Request) {
           status: 'APPROVED',
           approvedAmount: body.approvedAmount,
           interestRate: body.interestRate,
+          loanType: body.loanType || loan.loanType || 'EMI',
+          processingFee: body.processingFee || 0,
+          insuranceCharge: body.insuranceCharge || 0,
+          serviceCharge: body.serviceCharge || 0,
+          totalCharges: (body.processingFee || 0) + (body.insuranceCharge || 0) + (body.serviceCharge || 0),
+          penaltyRate: body.penaltyRate || 0,
           approvalDate: new Date().toISOString().split('T')[0],
           reviewedBy: body.reviewedBy || 'ADMIN',
           approvedBy: body.approvedBy || 'ADMIN',
@@ -82,20 +87,18 @@ export async function POST(request: Request) {
         const orgId = org?.id || 'org-sahakari-001'
         const product = await db.loanProduct.findUnique({ where: { id: loan.productId } })
 
-        // Find the appropriate loan receivable subsidiary account based on product
-        let loanReceivableAccount = await db.account.findFirst({ where: { code: '1131', organizationId: orgId } }) // Default: General
+        let loanReceivableAccount = await db.account.findFirst({ where: { code: '1131', organizationId: orgId } })
         if (product?.code?.includes('BIZ')) loanReceivableAccount = await db.account.findFirst({ where: { code: '1132', organizationId: orgId } })
         else if (product?.code?.includes('EMG')) loanReceivableAccount = await db.account.findFirst({ where: { code: '1133', organizationId: orgId } })
         else if (product?.code?.includes('AGR')) loanReceivableAccount = await db.account.findFirst({ where: { code: '1134', organizationId: orgId } })
         else if (product?.code?.includes('EDU')) loanReceivableAccount = await db.account.findFirst({ where: { code: '1135', organizationId: orgId } })
 
-        // Fallback to loan receivable control or any receivable
         if (!loanReceivableAccount) loanReceivableAccount = await db.account.findFirst({ where: { code: '1130', organizationId: orgId } })
         if (!loanReceivableAccount) loanReceivableAccount = await db.account.findFirst({ where: { subType: 'RECEIVABLE', type: 'ASSET', organizationId: orgId } })
 
         const cashAccount = await db.account.findFirst({ where: { subType: 'CASH', organizationId: orgId } })
         const bankAccount = await db.account.findFirst({ where: { subType: 'BANK', organizationId: orgId } })
-        const paymentAccount = bankAccount || cashAccount // Disburse via bank by default
+        const paymentAccount = bankAccount || cashAccount
 
         if (loanReceivableAccount && paymentAccount) {
           const lastEntry = await db.journalEntry.findFirst({ where: { voucherNo: { startsWith: 'PV' } }, orderBy: { voucherNo: 'desc' } })
@@ -140,6 +143,16 @@ export async function POST(request: Request) {
     const nextNum = lastApp ? parseInt(lastApp.applicationNo.replace('LA-', '')) + 1 : 1
     const applicationNo = `LA-${String(nextNum).padStart(3, '0')}`
 
+    // Get loan product for charges
+    const product = body.productId ? await db.loanProduct.findUnique({ where: { id: body.productId } }) : null
+
+    const processingFee = body.processingFee || product?.processingFee || 0
+    const insuranceCharge = body.insuranceCharge || product?.insuranceCharge || 0
+    const serviceCharge = body.serviceCharge || product?.serviceCharge || 0
+    const totalCharges = processingFee + insuranceCharge + serviceCharge
+    const loanType = body.loanType || product?.loanType || 'EMI'
+    const penaltyRate = body.penaltyRate || product?.penaltyRate || 0
+
     const application = await db.loanApplication.create({
       data: {
         applicationNo,
@@ -155,6 +168,12 @@ export async function POST(request: Request) {
         collateralValue: body.collateralValue ? parseFloat(body.collateralValue) : null,
         collateralDesc: body.collateralDesc || null,
         guarantorId: body.guarantorId || null,
+        loanType,
+        processingFee,
+        insuranceCharge,
+        serviceCharge,
+        totalCharges,
+        penaltyRate,
       },
     })
 

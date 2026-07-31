@@ -8,7 +8,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -238,6 +238,10 @@ model LoanProduct {
   insuranceRequired Boolean @default(false)
   guarantorRequired Boolean @default(true)
   collateralRequired Boolean @default(false)
+  loanType        String   @default("EMI") // EMI, FIXED
+  insuranceCharge Float    @default(0)
+  serviceCharge   Float    @default(0)
+  penaltyRate     Float    @default(0) // % per month
   organizationId  String
   organization    Organization @relation(fields: [organizationId], references: [id])
   isActive        Boolean  @default(true)
@@ -278,6 +282,14 @@ model LoanApplication {
   interestRate    Float?
   emiAmount       Float?
   nextDueDate     String?
+
+  // Loan Type & Charges
+  loanType        String   @default("EMI") // EMI, FIXED
+  processingFee   Float    @default(0)
+  insuranceCharge Float    @default(0)
+  serviceCharge   Float    @default(0)
+  totalCharges    Float    @default(0)
+  penaltyRate     Float    @default(0)
 
   // Review
   reviewedBy      String?

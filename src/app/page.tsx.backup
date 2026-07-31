@@ -2279,29 +2279,14 @@ function HRModule({ data, onRefresh }: { data: DashboardData; onRefresh: () => v
 
   // Fetch HR data (attendance, payroll, leave)
   useEffect(() => {
-    const loadHrData = async () => {
-      try {
-        // Load attendance for today
-        const attRes = await fetch(`/api/hr?action=attendance&date=${attendanceDate}`)
-        const attData = await attRes.json()
-        
-        // Load payroll records
-        const payRes = await fetch('/api/hr?action=payroll')
-        const payData = await payRes.json()
-        
-        // Load leave requests
-        const leaveRes = await fetch('/api/hr?action=leaves')
-        const leaveData = await leaveRes.json()
-        
-        setHrData({
-          attendances: attData.attendances || [],
-          leaveRequests: leaveData.leaveRequests || [],
-        })
-        setPayrollRecords(payData.payrollRecords || [])
-      } catch {}
-    }
-    loadHrData()
-  }, [attendanceDate])
+    fetch('/api/hr')
+      .then(r => r.json())
+      .then(d => {
+        if (d.attendances) setHrData(d)
+        if (d.payrollRecords) setPayrollRecords(d.payrollRecords)
+      })
+      .catch(() => {})
+  }, [])
 
   // Load attendance for the selected date
   const attendanceMap = React.useMemo(() => {
@@ -2330,10 +2315,10 @@ function HRModule({ data, onRefresh }: { data: DashboardData; onRefresh: () => v
     if (!editingEmpId) return
     setSaving(true)
     try {
-      const res = await fetch(`/api/employees/${editingEmpId}`, {
-        method: 'PUT',
+      const res = await fetch('/api/hr', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify({ action: 'updateEmployee', id: editingEmpId, ...editForm }),
       })
       if (res.ok) { toast.success('Employee updated! / कर्मचारी अपडेट भयो!'); setEditOpen(false); setEditForm({}); setEditingEmpId(null); onRefresh() }
       else toast.error('Failed to update employee')
@@ -2346,7 +2331,7 @@ function HRModule({ data, onRefresh }: { data: DashboardData; onRefresh: () => v
       const res = await fetch('/api/hr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'markAttendance', records: [{ employeeId, date: attendanceDate, status }] }),
+        body: JSON.stringify({ action: 'markAttendance', employeeId, date: attendanceDate, status }),
       })
       if (res.ok) {
         // Update local attendance map
@@ -2385,7 +2370,7 @@ function HRModule({ data, onRefresh }: { data: DashboardData; onRefresh: () => v
       const res = await fetch('/api/hr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'payPayroll', recordId: id }),
+        body: JSON.stringify({ action: 'payPayroll', payrollId: id }),
       })
       if (res.ok) {
         toast.success('Salary paid! / तलब भुक्तानी भयो!')

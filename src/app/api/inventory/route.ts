@@ -13,6 +13,54 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
+
+    // Stock transaction
+    if (body.action === 'stockIn' || body.action === 'stockOut') {
+      const { itemId, quantity, unitPrice, description, referenceNo } = body
+      if (!itemId || !quantity) {
+        return NextResponse.json({ error: 'itemId and quantity are required' }, { status: 400 })
+      }
+
+      const item = await db.inventoryItem.findUnique({ where: { id: itemId } })
+      if (!item) {
+        return NextResponse.json({ error: 'Item not found' }, { status: 404 })
+      }
+
+      const qty = parseInt(quantity)
+      const price = parseFloat(unitPrice) || item.unitPrice
+      const newQty = body.action === 'stockIn' ? item.quantity + qty : item.quantity - qty
+
+      if (newQty < 0) {
+        return NextResponse.json({ error: 'Insufficient stock' }, { status: 400 })
+      }
+
+      const [updatedItem, transaction] = await db.$transaction([
+        db.inventoryItem.update({
+          where: { id: itemId },
+          data: {
+            quantity: newQty,
+            unitPrice: price,
+            totalValue: newQty * price,
+          },
+        }),
+        db.inventoryTransaction.create({
+          data: {
+            itemId,
+            type: body.action === 'stockIn' ? 'PURCHASE' : 'SALE',
+            quantity: qty,
+            unitPrice: price,
+            totalAmount: qty * price,
+            date: new Date().toISOString().split('T')[0],
+            description: description || null,
+            referenceNo: referenceNo || null,
+          },
+        }),
+      ])
+
+      return NextResponse.json({ item: updatedItem, transaction }, { status: 201 })
+    }
+
+    // Create new item
     const item = await db.inventoryItem.create({
       data: {
         name: body.name,
