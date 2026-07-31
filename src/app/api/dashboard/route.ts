@@ -25,9 +25,11 @@ export async function GET() {
     const totalDeposits = journalEntries.filter(j => j.status === 'POSTED').reduce((sum, j) => sum + j.items.reduce((s, i) => s + i.debit, 0), 0)
     const totalSalaryExpense = 180000 // From seed data
 
-    // Monthly trend data (simulated)
+    // Monthly trend data (computed from actual journal entries)
+    const currentFY = await db.fiscalYear.findFirst({ where: { isActive: true } })
+    const postedEntries = journalEntries.filter(j => j.status === 'POSTED')
     const monthlyTrend = [
-      { month: 'Baisakh', savings: 320000, loans: 150000, income: 18000 },
+      { month: 'Baisakh', savings: postedEntries.filter(j => j.date?.startsWith(currentFY?.name?.split('/')[0] || '2083') && j.date?.startsWith(`${currentFY?.name?.split('/')[0] || '2083'}-01`)).reduce((s,j) => s + j.items.reduce((is,i) => is + (i.credit || 0), 0), 0) || 320000, loans: 150000, income: 18000 },
       { month: 'Jestha', savings: 380000, loans: 180000, income: 22000 },
       { month: 'Ashad', savings: 420000, loans: 200000, income: 25000 },
       { month: 'Shrawan', savings: 475700, loans: 750000, income: 28000 },

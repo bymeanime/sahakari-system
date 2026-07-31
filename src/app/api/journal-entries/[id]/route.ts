@@ -45,6 +45,26 @@ export async function PUT(
       return NextResponse.json({ error: 'Journal entry not found' }, { status: 404 })
     }
 
+    // Prevent modification of POSTED entries (audit integrity)
+    // Only DRAFT entries can be modified; POSTED entries can only be cancelled
+    if (existing.status === 'POSTED' && body.status !== 'CANCELLED') {
+      return NextResponse.json(
+        { error: 'Cannot modify a POSTED entry. Create a reversal entry instead. / पोस्ट गरिएको प्रविष्टि परिमार्जन गर्न सकिँदैन। उल्टो प्रविष्टि सिर्जना गर्नुहोस्।' },
+        { status: 400 }
+      )
+    }
+
+    // Check fiscal year closure
+    if (existing.date) {
+      const closedFY = await db.fiscalYear.findFirst({ where: { isClosed: true } })
+      if (closedFY && existing.date >= closedFY.startDate && existing.date <= closedFY.endDate) {
+        return NextResponse.json(
+          { error: 'Cannot modify entry in a closed fiscal year / बन्द आर्थिक वर्षको प्रविष्टि परिमार्जन गर्न सकिँदैन' },
+          { status: 400 }
+        )
+      }
+    }
+
     const data: Record<string, unknown> = {}
     if (body.status !== undefined) data.status = body.status
     if (body.postedBy !== undefined) data.postedBy = body.postedBy
@@ -89,6 +109,14 @@ export async function DELETE(
 
     if (existing.status === 'CANCELLED') {
       return NextResponse.json({ error: 'Journal entry is already cancelled' }, { status: 400 })
+    }
+
+    // Prevent cancelling POSTED entries - require reversal entry instead
+    if (existing.status === 'POSTED') {
+      return NextResponse.json(
+        { error: 'Cannot cancel a POSTED entry. Create a reversal entry instead. / पोस्ट गरिएको प्रविष्टि रद्द गर्न सकिँदैन। उल्टो प्रविष्टि सिर्जना गर्नुहोस्।' },
+        { status: 400 }
+      )
     }
 
     const entry = await db.journalEntry.update({

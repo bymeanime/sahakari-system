@@ -21,6 +21,35 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
 
+    // Create new account in chart of accounts
+    if (body.action === 'createAccount') {
+      const org = await db.organization.findFirst()
+      if (!org) {
+        return NextResponse.json({ error: 'No organization found' }, { status: 400 })
+      }
+
+      // Check if account code already exists
+      const existing = await db.account.findFirst({ where: { code: body.code } })
+      if (existing) {
+        return NextResponse.json({ error: `Account code ${body.code} already exists / खाता कोड ${body.code} पहिले नै अवस्थित छ` }, { status: 400 })
+      }
+
+      const account = await db.account.create({
+        data: {
+          code: body.code,
+          name: body.name,
+          nameNepali: body.nameNepali || null,
+          type: body.type,
+          subType: body.subType || null,
+          parentId: body.parentId || null,
+          organizationId: org.id,
+          isActive: true,
+          isSystem: false,
+        },
+      })
+      return NextResponse.json(account, { status: 201 })
+    }
+
     // Double-entry validation: require at least 2 line items
     if (!body.items || !Array.isArray(body.items) || body.items.length < 2) {
       return NextResponse.json(

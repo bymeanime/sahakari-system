@@ -121,6 +121,44 @@ export async function POST(request: Request) {
           },
         })
 
+        // Create corresponding journal entry (Receipt Voucher) for double-entry
+        try {
+          const org = await tx.organization.findFirst()
+          const orgId = org?.id || 'org-sahakari-001'
+          // Find Cash and Savings Deposit accounts
+          const cashAccount = await tx.account.findFirst({ where: { subType: 'CASH', organizationId: orgId } })
+          const savingsDepositAccount = await tx.account.findFirst({ where: { code: '2110', organizationId: orgId } })
+            || await tx.account.findFirst({ where: { code: '2100', organizationId: orgId } })
+            || await tx.account.findFirst({ where: { subType: 'PAYABLE', type: 'LIABILITY', organizationId: orgId } })
+
+          if (cashAccount && savingsDepositAccount) {
+            const lastEntry = await tx.journalEntry.findFirst({ where: { voucherNo: { startsWith: 'RV' } }, orderBy: { voucherNo: 'desc' } })
+            const nextNum = lastEntry ? parseInt(lastEntry.voucherNo.replace('RV-', '')) + 1 : 1
+            const voucherNo = `RV-${String(nextNum).padStart(4, '0')}`
+
+            await tx.journalEntry.create({
+              data: {
+                voucherNo,
+                date: data.date || new Date().toISOString().split('T')[0],
+                narration: `Savings deposit - ${data.accountNo} / बचत निक्षेप`,
+                entryType: 'RECEIPT',
+                status: 'POSTED',
+                postedBy: data.processedBy || 'SYSTEM',
+                postedAt: new Date(),
+                items: {
+                  create: [
+                    { accountId: cashAccount.id, debit: data.amount, credit: 0, description: `Cash received - ${data.accountNo}` },
+                    { accountId: savingsDepositAccount.id, debit: 0, credit: data.amount, description: `Savings deposit - ${data.accountNo}` },
+                  ],
+                },
+              },
+            })
+          }
+        } catch (jeError) {
+          // Journal entry creation failure should not block the deposit
+          console.error('Journal entry creation failed for deposit:', jeError)
+        }
+
         return updatedAccount
       })
 
@@ -199,6 +237,42 @@ export async function POST(request: Request) {
             processedBy: data.processedBy || 'ADMIN',
           },
         })
+
+        // Create corresponding journal entry (Payment Voucher) for double-entry
+        try {
+          const org = await tx.organization.findFirst()
+          const orgId = org?.id || 'org-sahakari-001'
+          const cashAccount = await tx.account.findFirst({ where: { subType: 'CASH', organizationId: orgId } })
+          const savingsDepositAccount = await tx.account.findFirst({ where: { code: '2110', organizationId: orgId } })
+            || await tx.account.findFirst({ where: { code: '2100', organizationId: orgId } })
+            || await tx.account.findFirst({ where: { subType: 'PAYABLE', type: 'LIABILITY', organizationId: orgId } })
+
+          if (cashAccount && savingsDepositAccount) {
+            const lastEntry = await tx.journalEntry.findFirst({ where: { voucherNo: { startsWith: 'PV' } }, orderBy: { voucherNo: 'desc' } })
+            const nextNum = lastEntry ? parseInt(lastEntry.voucherNo.replace('PV-', '')) + 1 : 1
+            const voucherNo = `PV-${String(nextNum).padStart(4, '0')}`
+
+            await tx.journalEntry.create({
+              data: {
+                voucherNo,
+                date: data.date || new Date().toISOString().split('T')[0],
+                narration: `Savings withdrawal - ${data.accountNo} / बचत निकासा`,
+                entryType: 'PAYMENT',
+                status: 'POSTED',
+                postedBy: data.processedBy || 'SYSTEM',
+                postedAt: new Date(),
+                items: {
+                  create: [
+                    { accountId: savingsDepositAccount.id, debit: data.amount, credit: 0, description: `Savings withdrawal - ${data.accountNo}` },
+                    { accountId: cashAccount.id, debit: 0, credit: data.amount, description: `Cash paid - ${data.accountNo}` },
+                  ],
+                },
+              },
+            })
+          }
+        } catch (jeError) {
+          console.error('Journal entry creation failed for withdrawal:', jeError)
+        }
 
         return updatedAccount
       })

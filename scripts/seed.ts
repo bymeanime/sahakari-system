@@ -26,7 +26,7 @@ async function main() {
       phone: '01-4234567',
       email: 'info@janatasahakari.org.np',
       level: 'PRIMARY',
-      fiscalYear: '2082/83',
+      fiscalYear: '2083/84',
       establishedDate: '2070-01-15',
       isActive: true,
     },
@@ -233,36 +233,74 @@ async function main() {
         outstandingAmount: la.outstandingAmount || null,
         emiAmount: la.emiAmount || null,
         guarantorId: la.guarantorId ? memberMap[la.guarantorId] : null,
-        applicationDate: '2082-01-15',
-        disbursementDate: la.status === 'DISBURSED' ? '2082-02-01' : null,
+        applicationDate: '2083-01-15',
+        disbursementDate: la.status === 'DISBURSED' ? '2083-02-01' : null,
       },
     })
   }
 
   // 9. Create Chart of Accounts
+  // Comprehensive hierarchical structure with subsidiary accounts for savings/loan products
   const accounts = [
+    // === ASSETS ===
     { code: '1000', name: 'Assets', nameNepali: 'सम्पत्ति', type: 'ASSET', subType: 'HEADER' },
     { code: '1100', name: 'Current Assets', nameNepali: 'चालु सम्पत्ति', type: 'ASSET', subType: 'HEADER' },
+    // Cash
     { code: '1110', name: 'Cash in Hand', nameNepali: 'हातमा नगद', type: 'ASSET', subType: 'CASH' },
+    { code: '1111', name: 'Cash - Main Vault', nameNepali: 'नगद - मुख्य भण्डार', type: 'ASSET', subType: 'CASH' },
+    { code: '1112', name: 'Cash - Teller 1', nameNepali: 'नगद - टेलर १', type: 'ASSET', subType: 'CASH' },
+    // Bank
     { code: '1120', name: 'Bank Account', nameNepali: 'बैंक खाता', type: 'ASSET', subType: 'BANK' },
-    { code: '1130', name: 'Savings Deposits', nameNepali: 'बचत निक्षेप', type: 'ASSET', subType: 'RECEIVABLE' },
-    { code: '1140', name: 'Loan Receivable', nameNepali: 'ऋण प्राप्य', type: 'ASSET', subType: 'RECEIVABLE' },
+    { code: '1121', name: 'Nabil Bank - Current A/C', nameNepali: 'नबिल बैंक - चालु खाता', type: 'ASSET', subType: 'BANK' },
+    { code: '1122', name: 'Nabil Bank - Savings A/C', nameNepali: 'नबिल बैंक - बचत खाता', type: 'ASSET', subType: 'BANK' },
+    // Loan Receivable (Control + Subsidiary)
+    { code: '1130', name: 'Loan Receivable Control Account', nameNepali: 'ऋण प्राप्य नियन्त्रण खाता', type: 'ASSET', subType: 'RECEIVABLE' },
+    { code: '1131', name: 'General Loan Receivable', nameNepali: 'सामान्य ऋण प्राप्य', type: 'ASSET', subType: 'RECEIVABLE' },
+    { code: '1132', name: 'Business Loan Receivable', nameNepali: 'व्यापार ऋण प्राप्य', type: 'ASSET', subType: 'RECEIVABLE' },
+    { code: '1133', name: 'Emergency Loan Receivable', nameNepali: 'आकस्मिक ऋण प्राप्य', type: 'ASSET', subType: 'RECEIVABLE' },
+    { code: '1134', name: 'Agriculture Loan Receivable', nameNepali: 'कृषि ऋण प्राप्य', type: 'ASSET', subType: 'RECEIVABLE' },
+    { code: '1135', name: 'Education Loan Receivable', nameNepali: 'शिक्षा ऋण प्राप्य', type: 'ASSET', subType: 'RECEIVABLE' },
+    // Other current assets
+    { code: '1140', name: 'Accrued Interest Receivable', nameNepali: 'उपचार ब्याज प्राप्य', type: 'ASSET', subType: 'RECEIVABLE' },
+    { code: '1150', name: 'Advance Payments', nameNepali: 'अग्रिम भुक्तानी', type: 'ASSET', subType: 'RECEIVABLE' },
+    // Fixed Assets
     { code: '1200', name: 'Fixed Assets', nameNepali: 'स्थिर सम्पत्ति', type: 'ASSET', subType: 'HEADER' },
     { code: '1210', name: 'Land & Building', nameNepali: 'जग्गा र भवन', type: 'ASSET', subType: 'FIXED' },
     { code: '1220', name: 'Furniture & Equipment', nameNepali: 'फर्निचर र उपकरण', type: 'ASSET', subType: 'FIXED' },
+
+    // === LIABILITIES ===
     { code: '2000', name: 'Liabilities', nameNepali: 'दायित्व', type: 'LIABILITY', subType: 'HEADER' },
-    { code: '2100', name: 'Member Deposits', nameNepali: 'सदस्य निक्षेप', type: 'LIABILITY', subType: 'PAYABLE' },
+    { code: '2100', name: 'Savings Deposit Control Account', nameNepali: 'बचत निक्षेप नियन्त्रण खाता', type: 'LIABILITY', subType: 'PAYABLE' },
+    // Savings product subsidiary accounts
+    { code: '2110', name: 'Regular Savings Deposit', nameNepali: 'नियमित बचत निक्षेप', type: 'LIABILITY', subType: 'PAYABLE' },
+    { code: '2120', name: 'Fixed Deposit Account', nameNepali: 'मुद्दती निक्षेप खाता', type: 'LIABILITY', subType: 'PAYABLE' },
+    { code: '2130', name: 'Daily Savings Deposit', nameNepali: 'दैनिक बचत निक्षेप', type: 'LIABILITY', subType: 'PAYABLE' },
+    { code: '2140', name: 'Recurring Deposit Account', nameNepali: 'आवर्ती निक्षेप खाता', type: 'LIABILITY', subType: 'PAYABLE' },
+    // Other liabilities
     { code: '2200', name: 'Share Capital', nameNepali: 'शेयर पूँजी', type: 'LIABILITY', subType: 'EQUITY' },
     { code: '2300', name: 'Reserve Fund', nameNepali: 'रिजर्भ कोष', type: 'LIABILITY', subType: 'EQUITY' },
+    { code: '2400', name: 'Interest Payable', nameNepali: 'ब्याज देय', type: 'LIABILITY', subType: 'PAYABLE' },
+
+    // === INCOME ===
     { code: '3000', name: 'Income', nameNepali: 'आम्दानी', type: 'INCOME', subType: 'HEADER' },
     { code: '3100', name: 'Interest Income', nameNepali: 'ब्याज आम्दानी', type: 'INCOME', subType: 'INTEREST' },
+    { code: '3110', name: 'Loan Interest Income', nameNepali: 'ऋण ब्याज आम्दानी', type: 'INCOME', subType: 'INTEREST' },
+    { code: '3120', name: 'Bank Interest Income', nameNepali: 'बैंक ब्याज आम्दानी', type: 'INCOME', subType: 'INTEREST' },
     { code: '3200', name: 'Fee Income', nameNepali: 'शुल्क आम्दानी', type: 'INCOME', subType: 'FEE' },
+    { code: '3210', name: 'Processing Fee Income', nameNepali: 'प्रोसेसिङ शुल्क आम्दानी', type: 'INCOME', subType: 'FEE' },
+    { code: '3220', name: 'Penalty Income', nameNepali: 'जरिवाना आम्दानी', type: 'INCOME', subType: 'FEE' },
     { code: '3300', name: 'Other Income', nameNepali: 'अन्य आम्दानी', type: 'INCOME', subType: 'OTHER' },
+
+    // === EXPENSES ===
     { code: '4000', name: 'Expenses', nameNepali: 'खर्च', type: 'EXPENSE', subType: 'HEADER' },
     { code: '4100', name: 'Interest Expense', nameNepali: 'ब्याज खर्च', type: 'EXPENSE', subType: 'INTEREST' },
+    { code: '4110', name: 'Savings Interest Expense', nameNepali: 'बचत ब्याज खर्च', type: 'EXPENSE', subType: 'INTEREST' },
+    { code: '4120', name: 'Deposit Interest Expense', nameNepali: 'निक्षेप ब्याज खर्च', type: 'EXPENSE', subType: 'INTEREST' },
     { code: '4200', name: 'Salary & Wages', nameNepali: 'तलब र ज्याला', type: 'EXPENSE', subType: 'SALARY' },
     { code: '4300', name: 'Office Expenses', nameNepali: 'कार्यालय खर्च', type: 'EXPENSE', subType: 'OFFICE' },
     { code: '4400', name: 'Depreciation', nameNepali: 'ह्रास', type: 'EXPENSE', subType: 'DEPRECIATION' },
+
+    // === EQUITY ===
     { code: '5000', name: 'Equity', nameNepali: 'इक्विटी', type: 'EQUITY', subType: 'HEADER' },
     { code: '5100', name: 'Retained Earnings', nameNepali: 'सञ्चित आम्दानी', type: 'EQUITY', subType: 'EQUITY' },
   ]
@@ -283,14 +321,26 @@ async function main() {
     accountMap[acct.code] = created.id
   }
 
-  // Update parent references
+  // Update parent references - proper hierarchical structure
   const parentMap: Record<string, string> = {
+    // Assets hierarchy
     '1100': '1000', '1200': '1000',
-    '1110': '1100', '1120': '1100', '1130': '1100', '1140': '1100',
+    '1110': '1100', '1111': '1110', '1112': '1110',
+    '1120': '1100', '1121': '1120', '1122': '1120',
+    '1130': '1100', '1131': '1130', '1132': '1130', '1133': '1130', '1134': '1130', '1135': '1130',
+    '1140': '1100', '1150': '1100',
     '1210': '1200', '1220': '1200',
-    '2100': '2000', '2200': '2000', '2300': '2000',
-    '3100': '3000', '3200': '3000', '3300': '3000',
-    '4100': '4000', '4200': '4000', '4300': '4000', '4400': '4000',
+    // Liabilities hierarchy
+    '2100': '2000', '2110': '2100', '2120': '2100', '2130': '2100', '2140': '2100',
+    '2200': '2000', '2300': '2000', '2400': '2000',
+    // Income hierarchy
+    '3100': '3000', '3110': '3100', '3120': '3100',
+    '3200': '3000', '3210': '3200', '3220': '3200',
+    '3300': '3000',
+    // Expenses hierarchy
+    '4100': '4000', '4110': '4100', '4120': '4100',
+    '4200': '4000', '4300': '4000', '4400': '4000',
+    // Equity hierarchy
     '5100': '5000',
   }
 
@@ -431,11 +481,138 @@ async function main() {
     })
   }
 
-  // 15. Create Journal Entries (using upsert to avoid unique constraint errors)
+  // 15. Create Journal Entries with proper voucher types
+  // All dates within fiscal year 2083/84
   const journalEntries = [
-    { voucherNo: 'JE-001', date: '2082-01-15', narration: 'Opening balance entry', status: 'POSTED', entryType: 'JOURNAL', items: [{ accountId: accountMap['1110'], debit: 500000, credit: 0 }, { accountId: accountMap['2100'], debit: 0, credit: 500000 }] },
-    { voucherNo: 'JE-002', date: '2082-01-20', narration: 'Loan disbursement', status: 'POSTED', entryType: 'PAYMENT', items: [{ accountId: accountMap['1140'], debit: 200000, credit: 0 }, { accountId: accountMap['1110'], debit: 0, credit: 200000 }] },
-    { voucherNo: 'JE-003', date: '2082-02-01', narration: 'Salary payment', status: 'POSTED', entryType: 'PAYMENT', items: [{ accountId: accountMap['4200'], debit: 180000, credit: 0 }, { accountId: accountMap['1110'], debit: 0, credit: 180000 }] },
+    // JOURNAL - Opening balance entry
+    { voucherNo: 'JE-001', date: '2083-01-01', narration: 'Opening balance entry for fiscal year 2083/84', status: 'POSTED', entryType: 'JOURNAL',
+      items: [
+        { accountId: accountMap['1110'], debit: 500000, credit: 0 },
+        { accountId: accountMap['1121'], debit: 1500000, credit: 0 },
+        { accountId: accountMap['2100'], debit: 0, credit: 1200000 },
+        { accountId: accountMap['2200'], debit: 0, credit: 800000 },
+      ]
+    },
+    // PAYMENT - Loan disbursement via cash
+    { voucherNo: 'JE-002', date: '2083-01-15', narration: 'General loan disbursement to Sita Thapa (M-001)', status: 'POSTED', entryType: 'PAYMENT',
+      items: [
+        { accountId: accountMap['1131'], debit: 200000, credit: 0 },
+        { accountId: accountMap['1110'], debit: 0, credit: 200000 },
+      ]
+    },
+    // PAYMENT - Agriculture loan disbursement via bank
+    { voucherNo: 'JE-003', date: '2083-01-20', narration: 'Agriculture loan disbursement to Hari Magar (M-002) via Nabil Bank', status: 'POSTED', entryType: 'PAYMENT',
+      items: [
+        { accountId: accountMap['1134'], debit: 100000, credit: 0 },
+        { accountId: accountMap['1121'], debit: 0, credit: 100000 },
+      ]
+    },
+    // RECEIPT - Savings deposit received
+    { voucherNo: 'JE-004', date: '2083-02-05', narration: 'Regular savings deposit - multiple members', status: 'POSTED', entryType: 'RECEIPT',
+      items: [
+        { accountId: accountMap['1110'], debit: 75000, credit: 0 },
+        { accountId: accountMap['2110'], debit: 0, credit: 75000 },
+      ]
+    },
+    // PAYMENT - Salary payment
+    { voucherNo: 'JE-005', date: '2083-02-01', narration: 'Salary payment for Magh 2083', status: 'POSTED', entryType: 'PAYMENT',
+      items: [
+        { accountId: accountMap['4200'], debit: 180000, credit: 0 },
+        { accountId: accountMap['1110'], debit: 0, credit: 180000 },
+      ]
+    },
+    // RECEIPT - Loan EMI collection
+    { voucherNo: 'JE-006', date: '2083-02-15', narration: 'EMI collection - General Loan (LA-001)', status: 'POSTED', entryType: 'RECEIPT',
+      items: [
+        { accountId: accountMap['1110'], debit: 9800, credit: 0 },
+        { accountId: accountMap['1131'], debit: 0, credit: 7800 },
+        { accountId: accountMap['3110'], debit: 0, credit: 2000 },
+      ]
+    },
+    // JOURNAL - Interest accrual on savings
+    { voucherNo: 'JE-007', date: '2083-03-31', narration: 'Quarterly interest accrual on savings deposits', status: 'POSTED', entryType: 'JOURNAL',
+      items: [
+        { accountId: accountMap['4110'], debit: 28500, credit: 0 },
+        { accountId: accountMap['2400'], debit: 0, credit: 28500 },
+      ]
+    },
+    // RECEIPT - Fixed deposit received
+    { voucherNo: 'JE-008', date: '2083-03-10', narration: 'Fixed deposit received from Laxmi Tamang (M-003)', status: 'POSTED', entryType: 'RECEIPT',
+      items: [
+        { accountId: accountMap['1110'], debit: 100000, credit: 0 },
+        { accountId: accountMap['2120'], debit: 0, credit: 100000 },
+      ]
+    },
+    // PAYMENT - Business loan disbursement via bank transfer
+    { voucherNo: 'JE-009', date: '2083-03-15', narration: 'Business loan disbursement to Krishna Sharma (M-006) via Nabil Bank', status: 'POSTED', entryType: 'PAYMENT',
+      items: [
+        { accountId: accountMap['1132'], debit: 450000, credit: 0 },
+        { accountId: accountMap['1121'], debit: 0, credit: 450000 },
+      ]
+    },
+    // RECEIPT - Processing fee collection
+    { voucherNo: 'JE-010', date: '2083-03-16', narration: 'Loan processing fee collection - Business Loan (LA-003)', status: 'POSTED', entryType: 'RECEIPT',
+      items: [
+        { accountId: accountMap['1110'], debit: 4500, credit: 0 },
+        { accountId: accountMap['3210'], debit: 0, credit: 4500 },
+      ]
+    },
+    // CONTRA - Cash deposit to bank
+    { voucherNo: 'JE-011', date: '2083-04-01', narration: 'Cash deposit to Nabil Bank - Current A/C', status: 'POSTED', entryType: 'CONTRA',
+      items: [
+        { accountId: accountMap['1121'], debit: 300000, credit: 0 },
+        { accountId: accountMap['1110'], debit: 0, credit: 300000 },
+      ]
+    },
+    // CONTRA - Cash withdrawal from bank
+    { voucherNo: 'JE-012', date: '2083-04-10', narration: 'Cash withdrawal from Nabil Bank for daily operations', status: 'POSTED', entryType: 'CONTRA',
+      items: [
+        { accountId: accountMap['1110'], debit: 100000, credit: 0 },
+        { accountId: accountMap['1121'], debit: 0, credit: 100000 },
+      ]
+    },
+    // JOURNAL - Interest income recognition
+    { voucherNo: 'JE-013', date: '2083-06-30', narration: 'Half-yearly loan interest income recognition', status: 'POSTED', entryType: 'JOURNAL',
+      items: [
+        { accountId: accountMap['1140'], debit: 45000, credit: 0 },
+        { accountId: accountMap['3110'], debit: 0, credit: 45000 },
+      ]
+    },
+    // PAYMENT - Office expenses
+    { voucherNo: 'JE-014', date: '2083-05-05', narration: 'Office rent and utility payment', status: 'POSTED', entryType: 'PAYMENT',
+      items: [
+        { accountId: accountMap['4300'], debit: 25000, credit: 0 },
+        { accountId: accountMap['1110'], debit: 0, credit: 25000 },
+      ]
+    },
+    // RECEIPT - Daily savings collection
+    { voucherNo: 'JE-015', date: '2083-05-20', narration: 'Daily savings collection from field', status: 'POSTED', entryType: 'RECEIPT',
+      items: [
+        { accountId: accountMap['1110'], debit: 15000, credit: 0 },
+        { accountId: accountMap['2130'], debit: 0, credit: 15000 },
+      ]
+    },
+    // JOURNAL - Depreciation entry
+    { voucherNo: 'JE-016', date: '2083-09-30', narration: 'Quarterly depreciation on fixed assets', status: 'POSTED', entryType: 'JOURNAL',
+      items: [
+        { accountId: accountMap['4400'], debit: 35000, credit: 0 },
+        { accountId: accountMap['1220'], debit: 0, credit: 35000 },
+      ]
+    },
+    // RECEIPT - Recurring deposit collection
+    { voucherNo: 'JE-017', date: '2083-07-01', narration: 'Recurring deposit monthly collection', status: 'POSTED', entryType: 'RECEIPT',
+      items: [
+        { accountId: accountMap['1110'], debit: 25000, credit: 0 },
+        { accountId: accountMap['2140'], debit: 0, credit: 25000 },
+      ]
+    },
+    // PAYMENT - Interest payment on savings
+    { voucherNo: 'JE-018', date: '2083-10-01', narration: 'Quarterly interest payment on regular savings', status: 'POSTED', entryType: 'PAYMENT',
+      items: [
+        { accountId: accountMap['4110'], debit: 12000, credit: 0 },
+        { accountId: accountMap['1110'], debit: 0, credit: 12000 },
+      ]
+    },
   ]
 
   for (const je of journalEntries) {
@@ -461,9 +638,9 @@ async function main() {
 
   // 16. Create Meetings
   const meetings = [
-    { title: 'Annual General Meeting 2082', titleNepali: 'वार्षिक आम सभा २०८२', type: 'ANNUAL_GENERAL', date: '2082-04-15', time: '10:00', venue: 'Community Hall, Putalisadak', status: 'SCHEDULED', agenda: 'Review annual report, approve budget, elect board members' },
-    { title: 'Board Meeting - Ashad', titleNepali: 'बोर्ड बैठक - असार', type: 'BOARD', date: '2082-02-30', time: '14:00', venue: 'Office Conference Room', status: 'COMPLETED', agenda: 'Review loan applications, approve new policies', decisions: 'Approved 5 new loan applications, revised interest rates for FD' },
-    { title: 'Center Meeting - Group A', titleNepali: 'केन्द्र बैठक - समूह ए', type: 'CENTER', date: '2082-03-05', time: '08:00', venue: 'Community Center', status: 'COMPLETED', agenda: 'Monthly savings collection, loan discussion' },
+    { title: 'Annual General Meeting 2083', titleNepali: 'वार्षिक आम सभा २०८३', type: 'ANNUAL_GENERAL', date: '2083-04-15', time: '10:00', venue: 'Community Hall, Putalisadak', status: 'SCHEDULED', agenda: 'Review annual report, approve budget, elect board members' },
+    { title: 'Board Meeting - Ashad', titleNepali: 'बोर्ड बैठक - असार', type: 'BOARD', date: '2083-02-30', time: '14:00', venue: 'Office Conference Room', status: 'COMPLETED', agenda: 'Review loan applications, approve new policies', decisions: 'Approved 5 new loan applications, revised interest rates for FD' },
+    { title: 'Center Meeting - Group A', titleNepali: 'केन्द्र बैठक - समूह ए', type: 'CENTER', date: '2083-03-05', time: '08:00', venue: 'Community Center', status: 'COMPLETED', agenda: 'Monthly savings collection, loan discussion' },
   ]
 
   for (const mt of meetings) {
@@ -485,13 +662,13 @@ async function main() {
 
   // 17. Create Fiscal Year
   await db.fiscalYear.upsert({
-    where: { id: 'fy-2082' },
+    where: { id: 'fy-2083' },
     update: {},
     create: {
-      id: 'fy-2082',
-      name: '2082/83',
-      startDate: '2082-01-01',
-      endDate: '2082-12-30',
+      id: 'fy-2083',
+      name: '2083/84',
+      startDate: '2083-01-01',
+      endDate: '2083-12-30',
       isActive: true,
       isClosed: false,
       organizationId: ORG_ID,
@@ -530,7 +707,7 @@ async function main() {
 
   // 19. Create Notifications
   const notifications = [
-    { userId: 'user-admin', title: 'EMI Due Reminder', message: 'Loan LA-001 EMI of NPR 8,500 is due on 2082-04-15', type: 'WARNING' },
+    { userId: 'user-admin', title: 'EMI Due Reminder', message: 'Loan LA-001 EMI of NPR 8,500 is due on 2083-04-15', type: 'WARNING' },
     { userId: 'user-admin', title: 'Loan Application Pending', message: '3 loan applications are pending review', type: 'INFO' },
     { userId: 'user-admin', title: 'Dormant Account Alert', message: 'Account SA-005 has been dormant for 6 months', type: 'WARNING' },
   ]

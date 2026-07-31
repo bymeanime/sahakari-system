@@ -75,6 +75,55 @@ export async function POST(request: Request) {
           nextDueDate: body.nextDueDate,
         },
       })
+
+      // Create corresponding Payment Voucher for loan disbursement
+      try {
+        const org = await db.organization.findFirst()
+        const orgId = org?.id || 'org-sahakari-001'
+        const product = await db.loanProduct.findUnique({ where: { id: loan.productId } })
+
+        // Find the appropriate loan receivable subsidiary account based on product
+        let loanReceivableAccount = await db.account.findFirst({ where: { code: '1131', organizationId: orgId } }) // Default: General
+        if (product?.code?.includes('BIZ')) loanReceivableAccount = await db.account.findFirst({ where: { code: '1132', organizationId: orgId } })
+        else if (product?.code?.includes('EMG')) loanReceivableAccount = await db.account.findFirst({ where: { code: '1133', organizationId: orgId } })
+        else if (product?.code?.includes('AGR')) loanReceivableAccount = await db.account.findFirst({ where: { code: '1134', organizationId: orgId } })
+        else if (product?.code?.includes('EDU')) loanReceivableAccount = await db.account.findFirst({ where: { code: '1135', organizationId: orgId } })
+
+        // Fallback to loan receivable control or any receivable
+        if (!loanReceivableAccount) loanReceivableAccount = await db.account.findFirst({ where: { code: '1130', organizationId: orgId } })
+        if (!loanReceivableAccount) loanReceivableAccount = await db.account.findFirst({ where: { subType: 'RECEIVABLE', type: 'ASSET', organizationId: orgId } })
+
+        const cashAccount = await db.account.findFirst({ where: { subType: 'CASH', organizationId: orgId } })
+        const bankAccount = await db.account.findFirst({ where: { subType: 'BANK', organizationId: orgId } })
+        const paymentAccount = bankAccount || cashAccount // Disburse via bank by default
+
+        if (loanReceivableAccount && paymentAccount) {
+          const lastEntry = await db.journalEntry.findFirst({ where: { voucherNo: { startsWith: 'PV' } }, orderBy: { voucherNo: 'desc' } })
+          const nextNum = lastEntry ? parseInt(lastEntry.voucherNo.replace('PV-', '')) + 1 : 1
+          const voucherNo = `PV-${String(nextNum).padStart(4, '0')}`
+
+          await db.journalEntry.create({
+            data: {
+              voucherNo,
+              date: new Date().toISOString().split('T')[0],
+              narration: `Loan disbursement - ${body.applicationNo} / ऋण वितरण`,
+              entryType: 'PAYMENT',
+              status: 'POSTED',
+              postedBy: 'SYSTEM',
+              postedAt: new Date(),
+              items: {
+                create: [
+                  { accountId: loanReceivableAccount.id, debit: body.disbursedAmount, credit: 0, description: `Loan disbursed - ${body.applicationNo}` },
+                  { accountId: paymentAccount.id, debit: 0, credit: body.disbursedAmount, description: `Payment for loan - ${body.applicationNo}` },
+                ],
+              },
+            },
+          })
+        }
+      } catch (jeError) {
+        console.error('Journal entry creation failed for loan disbursement:', jeError)
+      }
+
       return NextResponse.json(loan)
     }
 

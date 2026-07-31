@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useNavigationStore, type ModuleKey } from '@/store/navigation-store'
 import { formatBSDate, toNepaliDigits, getTodayBS, getBSMonthGrid, getBSMonthDays, bsMonths, bsMonthsNep, getBSYearRange, nprToWords } from '@/lib/bs-calendar'
@@ -508,12 +508,12 @@ export default function SahakariApp() {
           {activeModule === 'assets' && <AssetsModule data={data} onRefresh={loadData} />}
           {activeModule === 'shares' && <SharesModule data={data} onRefresh={loadData} />}
           {activeModule === 'meetings' && <MeetingsModule data={data} onRefresh={loadData} />}
-          {activeModule === 'reports' && <ReportsModule data={data} />}
+          {activeModule === 'reports' && <ReportsModule data={data} onRefresh={loadData} />}
           {activeModule === 'settings' && <SettingsModule data={data} />}
         </div>
         <footer className="bg-white border-t border-gray-200 px-4 py-3 text-center">
           <p className="text-xs text-gray-500">
-            Sahakari System v1.0 | Janata Sahakari Sanstha Ltd. | जनता सहकारी संस्था लि. | FY {toNepaliDigits('2082/83')}
+            Sahakari System v2.0 | Janata Sahakari Sanstha Ltd. | जनता सहकारी संस्था लि. | FY {toNepaliDigits(getTodayBS().split('-')[0])}
           </p>
         </footer>
       </main>
@@ -1408,7 +1408,14 @@ function AccountingModule({ data, onRefresh }: { data: DashboardData; onRefresh:
   const [voucherType, setVoucherType] = useState<string>('PAYMENT')
 
   const accounts = data.accounts || []
-  const nonHeaderAccounts = accounts.filter((a: any) => a.subType !== 'HEADER')
+  const nonHeaderAccounts = accounts.filter((a: any) => a.subType !== 'HEADER' && a.isActive !== false)
+  // Group accounts by type for organized display
+  const accountsByType = nonHeaderAccounts.reduce((acc: Record<string, any[]>, a: any) => {
+    const key = a.type || 'OTHER'
+    if (!acc[key]) acc[key] = []
+    acc[key].push(a)
+    return acc
+  }, {})
 
   const totalDebit = entryForm.items.reduce((s, i) => s + (i.debit || 0), 0)
   const totalCredit = entryForm.items.reduce((s, i) => s + (i.credit || 0), 0)
@@ -1416,16 +1423,37 @@ function AccountingModule({ data, onRefresh }: { data: DashboardData; onRefresh:
 
   // Reset form and open dialog
   const openNewEntry = (preType?: string) => {
+    const cashAccount = nonHeaderAccounts.find((a: any) => a.subType === 'CASH' || a.code === '1110')
+    const bankAccount = nonHeaderAccounts.find((a: any) => a.subType === 'BANK' || a.code === '1120')
+    let defaultItems = [
+      { accountId: '', debit: 0, credit: 0, description: '' },
+      { accountId: '', debit: 0, credit: 0, description: '' },
+    ]
+    // Pre-populate cash/bank for voucher types
+    if (preType === 'PAYMENT') {
+      defaultItems = [
+        { accountId: '', debit: 0, credit: 0, description: 'Payment to' },
+        { accountId: cashAccount?.id || bankAccount?.id || '', debit: 0, credit: 0, description: 'Cash/Bank' },
+      ]
+    } else if (preType === 'RECEIPT') {
+      defaultItems = [
+        { accountId: cashAccount?.id || bankAccount?.id || '', debit: 0, credit: 0, description: 'Cash/Bank' },
+        { accountId: '', debit: 0, credit: 0, description: 'Received from' },
+      ]
+    } else if (preType === 'CONTRA') {
+      defaultItems = [
+        { accountId: cashAccount?.id || '', debit: 0, credit: 0, description: 'Cash' },
+        { accountId: bankAccount?.id || '', debit: 0, credit: 0, description: 'Bank' },
+      ]
+    }
     setEntryForm({
       entryType: preType || 'JOURNAL',
       date: getTodayBS(),
       narration: '',
       narrationNep: '',
-      items: [
-        { accountId: '', debit: 0, credit: 0, description: '' },
-        { accountId: '', debit: 0, credit: 0, description: '' },
-      ],
+      items: defaultItems,
     })
+    setVoucherType(preType || 'JOURNAL')
     setNewEntryOpen(true)
   }
 
@@ -1962,9 +1990,14 @@ function AccountingModule({ data, onRefresh }: { data: DashboardData; onRefresh:
                     <TableRow key={idx}>
                       <TableCell>
                         <Select value={item.accountId} onValueChange={v => updateItem(idx, 'accountId', v)}>
-                          <SelectTrigger className="w-48"><SelectValue placeholder="Select account" /></SelectTrigger>
+                          <SelectTrigger className="w-56"><SelectValue placeholder="Select account / खाता छान्नुहोस्" /></SelectTrigger>
                           <SelectContent>
-                            {nonHeaderAccounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>)}
+                            {Object.entries(accountsByType).map(([type, accts]) => (
+                              <React.Fragment key={type}>
+                                <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50">{type}</div>
+                                {accts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>)}
+                              </React.Fragment>
+                            ))}
                           </SelectContent>
                         </Select>
                       </TableCell>
@@ -1995,8 +2028,8 @@ function AccountingModule({ data, onRefresh }: { data: DashboardData; onRefresh:
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewEntryOpen(false)}>Cancel</Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleSubmitEntry} disabled={saving || !isBalanced || !entryForm.narration || entryForm.items.some(i => !i.accountId)}>
-              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Submit Entry
+            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleSubmitEntry} disabled={saving}>
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Submit {entryForm.entryType === 'PAYMENT' ? 'Payment' : entryForm.entryType === 'RECEIPT' ? 'Receipt' : entryForm.entryType === 'CONTRA' ? 'Contra' : 'Journal'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2231,7 +2264,7 @@ function MeetingsModule({ data, onRefresh }: { data: DashboardData; onRefresh: (
 // ============================================================
 // REPORTS MODULE (Enhanced - with new accounting reports)
 // ============================================================
-function ReportsModule({ data }: { data: DashboardData }) {
+function ReportsModule({ data, onRefresh }: { data: DashboardData; onRefresh: () => void }) {
   const [reportData, setReportData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [accountingReportData, setAccountingReportData] = useState<any>(null)
@@ -2726,31 +2759,181 @@ function ReportsModule({ data }: { data: DashboardData }) {
 // ============================================================
 function SettingsModule({ data }: { data: DashboardData }) {
   const [tab, setTab] = useState('organization')
+  const [saving, setSaving] = useState(false)
+  const [orgForm, setOrgForm] = useState({
+    name: 'Janata Sahakari Sanstha Ltd.',
+    nameNepali: 'जनता सहकारी संस्था लि.',
+    code: 'JSS-001',
+    panNo: '301234567',
+    province: 'Bagmati',
+    district: 'Kathmandu',
+    phone: '01-4234567',
+    email: 'info@janatasahakari.org.np',
+  })
+  const [newAccountForm, setNewAccountForm] = useState<Record<string, string>>({ type: 'ASSET', subType: '', date: getTodayBS() })
+
+  const handleSaveOrg = async () => {
+    setSaving(true)
+    try {
+      const org = data.accounts?.[0]?.organizationId || 'org-sahakari-001'
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'updateOrg', ...orgForm }),
+      })
+      if (res.ok) toast.success('Organization updated! / संस्था अपडेट भयो!')
+      else toast.error('Failed to update organization')
+    } catch { toast.error('Network error') }
+    setSaving(false)
+  }
+
+  const handleCreateAccount = async () => {
+    if (!newAccountForm.code || !newAccountForm.name || !newAccountForm.type) {
+      toast.error('Code, Name, and Type are required / कोड, नाम र प्रकार आवश्यक छ')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/accounting', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'createAccount',
+          code: newAccountForm.code,
+          name: newAccountForm.name,
+          nameNepali: newAccountForm.nameNepali || null,
+          type: newAccountForm.type,
+          subType: newAccountForm.subType || null,
+          parentId: newAccountForm.parentId || null,
+        }),
+      })
+      if (res.ok) {
+        toast.success('Account created! / खाता सिर्जना भयो!')
+        setNewAccountForm({ type: 'ASSET', subType: '', date: getTodayBS() })
+      } else {
+        const d = await res.json()
+        toast.error(d.error || 'Failed to create account')
+      }
+    } catch { toast.error('Network error') }
+    setSaving(false)
+  }
+
+  const accounts = data.accounts || []
+  const accountsByType = accounts.reduce((acc: Record<string, any[]>, a: any) => {
+    const key = a.type || 'OTHER'
+    if (!acc[key]) acc[key] = []
+    acc[key].push(a)
+    return acc
+  }, {})
+
   return (
     <div className="space-y-6">
       <div><h2 className="text-2xl font-bold text-gray-900">Settings</h2><p className="text-gray-500 text-sm">सेटिङ र कन्फिगरेसन</p></div>
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="organization">Organization</TabsTrigger>
+          <TabsTrigger value="accounts">Chart of Accounts</TabsTrigger>
           <TabsTrigger value="branches">Branches</TabsTrigger>
           <TabsTrigger value="fiscal">Fiscal Year</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="system">System</TabsTrigger>
         </TabsList>
         <TabsContent value="organization" className="mt-4">
-          <Card className="border-0 shadow-sm"><CardHeader><CardTitle className="text-base">Organization Details</CardTitle><CardDescription>Manage your cooperative organization information</CardDescription></CardHeader>
+          <Card className="border-0 shadow-sm"><CardHeader><CardTitle className="text-base">Organization Details / संस्था विवरण</CardTitle><CardDescription>Manage your cooperative organization information</CardDescription></CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Organization Name</Label><Input defaultValue="Janata Sahakari Sanstha Ltd." /></div>
-              <div className="space-y-2"><Label>संस्थाको नाम</Label><Input defaultValue="जनता सहकारी संस्था लि." /></div>
-              <div className="space-y-2"><Label>Code</Label><Input defaultValue="JSS-001" /></div>
-              <div className="space-y-2"><Label>PAN No.</Label><Input defaultValue="301234567" /></div>
+              <div className="space-y-2"><Label>Organization Name</Label><Input value={orgForm.name} onChange={e => setOrgForm({...orgForm, name: e.target.value})} /></div>
+              <div className="space-y-2"><Label>संस्थाको नाम</Label><Input value={orgForm.nameNepali} onChange={e => setOrgForm({...orgForm, nameNepali: e.target.value})} /></div>
+              <div className="space-y-2"><Label>Code</Label><Input value={orgForm.code} onChange={e => setOrgForm({...orgForm, code: e.target.value})} /></div>
+              <div className="space-y-2"><Label>PAN No.</Label><Input value={orgForm.panNo} onChange={e => setOrgForm({...orgForm, panNo: e.target.value})} /></div>
               <div className="space-y-2"><Label>Province</Label>
-                <Select defaultValue="Bagmati"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{['Koshi','Madhesh','Bagmati','Gandaki','Lumbini','Karnali','Sudurpashchim'].map(p=><SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select>
+                <Select value={orgForm.province} onValueChange={v => setOrgForm({...orgForm, province: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{['Koshi','Madhesh','Bagmati','Gandaki','Lumbini','Karnali','Sudurpashchim'].map(p=><SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select>
               </div>
-              <div className="space-y-2"><Label>District</Label><Input defaultValue="Kathmandu" /></div>
+              <div className="space-y-2"><Label>District</Label><Input value={orgForm.district} onChange={e => setOrgForm({...orgForm, district: e.target.value})} /></div>
+              <div className="space-y-2"><Label>Phone</Label><Input value={orgForm.phone} onChange={e => setOrgForm({...orgForm, phone: e.target.value})} /></div>
+              <div className="space-y-2"><Label>Email</Label><Input value={orgForm.email} onChange={e => setOrgForm({...orgForm, email: e.target.value})} /></div>
             </div>
-            <Button className="mt-6 bg-emerald-600 hover:bg-emerald-700">Save Changes</Button>
+            <Button className="mt-6 bg-emerald-600 hover:bg-emerald-700" onClick={handleSaveOrg} disabled={saving}>
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Save Changes / परिवर्तन सुरक्षित गर्नुहोस्
+            </Button>
+          </CardContent></Card>
+        </TabsContent>
+        <TabsContent value="accounts" className="mt-4">
+          <Card className="border-0 shadow-sm"><CardHeader>
+            <div className="flex items-center justify-between">
+              <div><CardTitle className="text-base">Chart of Accounts / खाता योजना</CardTitle><CardDescription>Manage your accounting chart of accounts with subsidiary ledgers</CardDescription></div>
+              <Dialog>
+                <DialogTrigger asChild><Button className="bg-emerald-600 hover:bg-emerald-700"><Plus className="w-4 h-4 mr-2" /> New Account</Button></DialogTrigger>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader><DialogTitle>New Account / नयाँ खाता</DialogTitle><DialogDescription>Create a new account in the chart of accounts</DialogDescription></DialogHeader>
+                  <div className="grid grid-cols-2 gap-4 py-4">
+                    <div className="space-y-2"><Label>Account Code *</Label><Input placeholder="e.g. 1131" value={newAccountForm.code || ''} onChange={e => setNewAccountForm({...newAccountForm, code: e.target.value})} /></div>
+                    <div className="space-y-2"><Label>Account Name *</Label><Input placeholder="e.g. General Loan Receivable" value={newAccountForm.name || ''} onChange={e => setNewAccountForm({...newAccountForm, name: e.target.value})} /></div>
+                    <div className="space-y-2"><Label>नाम (नेपाली)</Label><Input placeholder="खाताको नाम" value={newAccountForm.nameNepali || ''} onChange={e => setNewAccountForm({...newAccountForm, nameNepali: e.target.value})} /></div>
+                    <div className="space-y-2"><Label>Account Type *</Label>
+                      <Select value={newAccountForm.type} onValueChange={v => setNewAccountForm({...newAccountForm, type: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+                        <SelectItem value="ASSET">Asset / सम्पत्ति</SelectItem>
+                        <SelectItem value="LIABILITY">Liability / दायित्व</SelectItem>
+                        <SelectItem value="INCOME">Income / आय</SelectItem>
+                        <SelectItem value="EXPENSE">Expense / खर्च</SelectItem>
+                        <SelectItem value="EQUITY">Equity / सेयर</SelectItem>
+                      </SelectContent></Select>
+                    </div>
+                    <div className="space-y-2"><Label>Sub Type</Label>
+                      <Select value={newAccountForm.subType || ''} onValueChange={v => setNewAccountForm({...newAccountForm, subType: v})}><SelectTrigger><SelectValue placeholder="Select sub-type" /></SelectTrigger><SelectContent>
+                        <SelectItem value="CASH">Cash / नगद</SelectItem>
+                        <SelectItem value="BANK">Bank / बैंक</SelectItem>
+                        <SelectItem value="RECEIVABLE">Receivable / देना</SelectItem>
+                        <SelectItem value="PAYABLE">Payable / देय</SelectItem>
+                        <SelectItem value="INTEREST">Interest / ब्याज</SelectItem>
+                        <SelectItem value="FEE">Fee / शुल्क</SelectItem>
+                        <SelectItem value="SALARY">Salary / तलब</SelectItem>
+                        <SelectItem value="DEPRECIATION">Depreciation / ह्रास</SelectItem>
+                        <SelectItem value="HEADER">Header / शीर्षक</SelectItem>
+                      </SelectContent></Select>
+                    </div>
+                    <div className="space-y-2"><Label>Parent Account</Label>
+                      <Select value={newAccountForm.parentId || ''} onValueChange={v => setNewAccountForm({...newAccountForm, parentId: v})}><SelectTrigger><SelectValue placeholder="None (Top-level)" /></SelectTrigger><SelectContent>
+                        <SelectItem value="">None (Top-level)</SelectItem>
+                        {accounts.filter(a => a.subType === 'HEADER' || !a.parentId).map(a => <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>)}
+                      </SelectContent></Select>
+                    </div>
+                  </div>
+                  <DialogFooter><Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleCreateAccount} disabled={saving || !newAccountForm.code || !newAccountForm.name}>
+                    {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Create Account
+                  </Button></DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {Object.entries(accountsByType).map(([type, accts]) => (
+              <div key={type} className="mb-6">
+                <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                  <Badge className={type === 'ASSET' ? 'bg-emerald-100 text-emerald-800' : type === 'LIABILITY' ? 'bg-rose-100 text-rose-800' : type === 'INCOME' ? 'bg-blue-100 text-blue-800' : type === 'EXPENSE' ? 'bg-amber-100 text-amber-800' : 'bg-purple-100 text-purple-800'}>
+                    {type} ({accts.length})
+                  </Badge>
+                </h4>
+                <Card className="border shadow-none"><CardContent className="p-0"><div className="overflow-x-auto">
+                  <Table><TableHeader><TableRow className="bg-gray-50">
+                    <TableHead className="font-semibold">Code</TableHead><TableHead className="font-semibold">Name</TableHead>
+                    <TableHead className="font-semibold hidden sm:table-cell">नेपाली</TableHead>
+                    <TableHead className="font-semibold hidden md:table-cell">Sub-Type</TableHead>
+                    <TableHead className="font-semibold">Status</TableHead>
+                  </TableRow></TableHeader><TableBody>
+                    {accts.map((a: any) => (
+                      <TableRow key={a.id} className="hover:bg-gray-50">
+                        <TableCell className="font-mono text-sm">{a.code}</TableCell>
+                        <TableCell className="font-medium">{a.name}</TableCell>
+                        <TableCell className="hidden sm:table-cell text-sm text-gray-500">{a.nameNepali || '—'}</TableCell>
+                        <TableCell className="hidden md:table-cell"><Badge variant="outline">{a.subType || '—'}</Badge></TableCell>
+                        <TableCell><Badge className={a.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-800'}>{a.isActive ? 'Active' : 'Inactive'}</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody></Table>
+                </div></CardContent></Card>
+              </div>
+            ))}
           </CardContent></Card>
         </TabsContent>
         <TabsContent value="fiscal" className="mt-4">
@@ -2758,11 +2941,11 @@ function SettingsModule({ data }: { data: DashboardData }) {
           <CardContent>
             <div className="space-y-3">
               <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-lg border border-emerald-200">
-                <div><p className="font-medium text-emerald-800">Fiscal Year 2082/83</p><p className="text-sm text-emerald-600">बैशाख १ - चैत्र ३०</p></div>
+                <div><p className="font-medium text-emerald-800">Fiscal Year 2083/84</p><p className="text-sm text-emerald-600">बैशाख १ - चैत्र ३० (2083-01-01 to 2083-12-30)</p></div>
                 <Badge className="bg-emerald-100 text-emerald-800">Active</Badge>
               </div>
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div><p className="font-medium">Fiscal Year 2081/82</p><p className="text-sm text-gray-500">बैशाख १ - चैत्र ३०</p></div>
+                <div><p className="font-medium">Fiscal Year 2082/83</p><p className="text-sm text-gray-500">बैशाख १ - चैत्र ३०</p></div>
                 <Badge className="bg-gray-100 text-gray-800">Closed</Badge>
               </div>
             </div>
@@ -2772,13 +2955,13 @@ function SettingsModule({ data }: { data: DashboardData }) {
           <Card className="border-0 shadow-sm"><CardHeader><CardTitle className="text-base">System Information</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex justify-between py-2 border-b"><span className="text-gray-500">Version</span><span className="font-medium">1.0.0</span></div>
+              <div className="flex justify-between py-2 border-b"><span className="text-gray-500">Version</span><span className="font-medium">2.0.0</span></div>
               <div className="flex justify-between py-2 border-b"><span className="text-gray-500">Framework</span><span className="font-medium">Next.js 16</span></div>
-              <div className="flex justify-between py-2 border-b"><span className="text-gray-500">Database</span><span className="font-medium">SQLite / Prisma</span></div>
+              <div className="flex justify-between py-2 border-b"><span className="text-gray-500">Database</span><span className="font-medium">PostgreSQL (Neon) / Prisma</span></div>
               <div className="flex justify-between py-2 border-b"><span className="text-gray-500">Currency</span><span className="font-medium">NPR (Nepalese Rupee)</span></div>
               <div className="flex justify-between py-2 border-b"><span className="text-gray-500">Calendar</span><span className="font-medium">Bikram Sambat (BS)</span></div>
               <div className="flex justify-between py-2 border-b"><span className="text-gray-500">Compliance</span><span className="font-medium">Cooperative Act 2047 & NRB</span></div>
-              <div className="flex justify-between py-2"><span className="text-gray-500">PWA</span><span className="font-medium text-emerald-600">Enabled</span></div>
+              <div className="flex justify-between py-2 border-b"><span className="text-gray-500">Today (BS)</span><span className="font-medium text-emerald-600">{getTodayBS()}</span></div>
             </div>
           </CardContent></Card>
         </TabsContent>

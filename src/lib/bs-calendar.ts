@@ -1,32 +1,44 @@
 /**
  * Bikram Sambat (BS) Calendar Utility for Nepal
  * Converts between AD (Gregorian) and BS (Bikram Sambat) dates
+ *
+ * Uses accurate month-length data sourced from nepali-date-converter
+ * and a fixed reference date for precise AD↔BS conversion.
  */
 
 // BS Calendar data - days in each month for years 2070-2090
+// Verified against nepali-date-converter library for accuracy
+// Month order: Baisakh, Jestha, Ashad, Shrawan, Bhadra, Ashwin,
+//              Kartik, Mangsir, Poush, Magh, Falgun, Chaitra
 const bsCalendarData: Record<number, number[]> = {
-  2070: [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31],
+  2070: [31, 31, 31, 32, 31, 31, 29, 30, 30, 29, 30, 30],
   2071: [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30],
-  2072: [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30],
+  2072: [31, 32, 31, 32, 31, 30, 30, 29, 30, 29, 30, 30],
   2073: [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31],
-  2074: [30, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31],
-  2075: [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 30],
-  2076: [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31],
-  2077: [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30],
-  2078: [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30],
-  2079: [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31],
-  2080: [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31],
-  2081: [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 30],
-  2082: [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31],
-  2083: [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 30, 30],
-  2084: [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31],
-  2085: [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 30],
-  2086: [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31],
-  2087: [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30],
-  2088: [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30],
-  2089: [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31],
-  2090: [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31],
+  2074: [31, 31, 31, 32, 31, 31, 30, 29, 30, 29, 30, 30],
+  2075: [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30],
+  2076: [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 30],
+  2077: [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31],
+  2078: [31, 31, 31, 32, 31, 31, 30, 29, 30, 29, 30, 30],
+  2079: [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30],
+  2080: [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 30],
+  2081: [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31],
+  2082: [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30],
+  2083: [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30],
+  2084: [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31],
+  2085: [30, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31],
+  2086: [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30],
+  2087: [31, 31, 32, 31, 31, 31, 30, 30, 29, 30, 30, 30],
+  2088: [30, 31, 32, 32, 30, 31, 30, 30, 29, 30, 30, 30],
+  2089: [30, 32, 31, 32, 31, 30, 30, 30, 29, 30, 30, 30],
+  2090: [30, 32, 31, 32, 31, 30, 30, 30, 29, 30, 30, 30],
 }
+
+// Reference point: BS 2070/01/01 (Baisakh 1, 2070) = April 14, 2013 AD
+const BS_REF_YEAR = 2070
+const BS_REF_MONTH = 1
+const BS_REF_DAY = 1
+const AD_REF_DATE = new Date(2013, 3, 14) // April 14, 2013 (month is 0-indexed)
 
 export const bsMonths = [
   'Baisakh', 'Jestha', 'Ashad', 'Shrawan', 'Bhadra', 'Ashwin',
@@ -72,9 +84,25 @@ export function getBSMonthGrid(year: number, month: number): (number | null)[][]
   const weeks: (number | null)[][] = []
   let week: (number | null)[] = []
 
-  // Approximate: BS months start on different days
-  // For simplicity, we'll use a basic algorithm
-  const startDay = ((year + month) % 7) // Simplified start day
+  // Calculate the correct start day of the week for the first day of this BS month
+  // We use the adToBS reference point and walk forward to find the weekday
+  let startDay = 0 // Default to Sunday (0)
+
+  // Calculate total days from BS 2070/01/01 to the start of this month
+  let totalDaysFromRef = 0
+  for (let y = BS_REF_YEAR; y < year; y++) {
+    for (let m = 0; m < 12; m++) {
+      totalDaysFromRef += bsCalendarData[y] ? bsCalendarData[y][m] : 30
+    }
+  }
+  for (let m = 0; m < month - 1; m++) {
+    totalDaysFromRef += bsCalendarData[year] ? bsCalendarData[year][m] : 30
+  }
+
+  // BS 2070/01/01 = April 14, 2013 = Sunday (getDay() returns 0)
+  // So the first day of the month is (totalDaysFromRef % 7) days after Sunday
+  const refDayOfWeek = AD_REF_DATE.getDay() // 0 = Sunday
+  startDay = (refDayOfWeek + totalDaysFromRef) % 7
 
   for (let i = 0; i < startDay; i++) {
     week.push(null)
@@ -96,27 +124,67 @@ export function getBSMonthGrid(year: number, month: number): (number | null)[][]
   return weeks
 }
 
-// Get today's approximate BS date
-export function getTodayBS(): string {
-  const today = new Date()
-  const adYear = today.getFullYear()
-  // Approximate BS year (BS is ~57 years ahead of AD)
-  const bsYear = adYear + 57
-  const adMonth = today.getMonth() + 1
-  // BS months are offset by about 2-3 months from AD
-  // Baisakh starts around mid-April
-  let bsMonth = adMonth - 3
-  if (bsMonth <= 0) bsMonth += 12
-  if (bsMonth > 12) bsMonth = 12
-  const bsDay = today.getDate()
+/**
+ * Convert an AD (Gregorian) date to a BS (Bikram Sambat) date string.
+ *
+ * Algorithm:
+ * 1. Calculate the number of days from the reference AD date (April 14, 2013)
+ *    to the target AD date.
+ * 2. Add those days to the reference BS date (2070/01/01), walking through
+ *    the BS calendar lookup table month by month.
+ * 3. Return the resulting BS date in "YYYY-MM-DD" format.
+ *
+ * Accurate for AD dates from April 14, 2013 onward (BS 2070–2090).
+ */
+export function adToBS(adDate: Date): string {
+  const diffTime = adDate.getTime() - AD_REF_DATE.getTime()
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
 
-  // Validate
-  if (bsCalendarData[bsYear]) {
-    const maxDays = bsCalendarData[bsYear][bsMonth - 1]
-    return `${bsYear}-${String(bsMonth).padStart(2, '0')}-${String(Math.min(bsDay, maxDays)).padStart(2, '0')}`
+  if (diffDays < 0) {
+    // Before reference date — fall back to approximation
+    const adYear = adDate.getFullYear()
+    const bsYear = adYear + 56
+    return `${bsYear}-01-01`
+  }
+
+  let bsYear = BS_REF_YEAR
+  let bsMonth = BS_REF_MONTH
+  let bsDay = BS_REF_DAY
+  let remainingDays = diffDays
+
+  while (remainingDays > 0) {
+    const daysInMonth = bsCalendarData[bsYear]
+      ? bsCalendarData[bsYear][bsMonth - 1]
+      : 30
+
+    if (bsDay + remainingDays <= daysInMonth) {
+      bsDay += remainingDays
+      remainingDays = 0
+    } else {
+      // Move to the 1st of the next month
+      remainingDays -= daysInMonth - bsDay + 1
+      bsDay = 1
+      bsMonth++
+
+      if (bsMonth > 12) {
+        bsMonth = 1
+        bsYear++
+      }
+    }
   }
 
   return `${bsYear}-${String(bsMonth).padStart(2, '0')}-${String(bsDay).padStart(2, '0')}`
+}
+
+/**
+ * Get today's date in Bikram Sambat format.
+ * Returns a string in "YYYY-MM-DD" format.
+ *
+ * Uses the accurate adToBS() conversion instead of the
+ * crude adYear+57 approximation.
+ */
+export function getTodayBS(): string {
+  return adToBS(new Date())
 }
 
 // Nepali number to words (for check printing, etc.)
